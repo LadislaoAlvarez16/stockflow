@@ -14,6 +14,7 @@ import { CommonModule } from './common/common.module';
 import { ConfigModule } from '@nestjs/config';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { CategoriesModule } from './categories/categories.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -26,6 +27,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     AlertsModule,
     DashboardModule,
     CommonModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [
