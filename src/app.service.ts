@@ -1,16 +1,29 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { PrismaService } from './common/prisma.service';
 
 @Injectable()
-export class AppService implements OnModuleInit {
+export class AppService {
   private readonly logger = new Logger(AppService.name);
 
-  async onModuleInit() {
-    // Simulamos la respuesta de la DB temporalmente para el entregable del MVP Base
-    this.logger.log('🚀 Conexión a PostgreSQL (Simulada) establecida correctamente.');
+  constructor(private readonly prisma: PrismaService) {}
+
+  async checkHealth(): Promise<{ status: string }> {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return { status: 'ok' };
+    } catch (error) {
+      this.logger.error('Database connection failed', error);
+      throw new ServiceUnavailableException(
+        'Database connection is currently unavailable',
+      );
+    }
   }
 
   getHello(): string {
-    return 'StockFlow API running';
+    return 'Sistema StockFlow - Motor de Inventario Activo';
   }
 }
