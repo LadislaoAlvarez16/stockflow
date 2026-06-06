@@ -4,6 +4,13 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
+import { User } from '@prisma/client';
+
+export type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+  user: Omit<User, 'passwordHash'>;
+};
 
 @Injectable()
 export class AuthService {
@@ -13,7 +20,7 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto): Promise<LoginResponse> {
     const user = await this.usersService.findByEmail(loginDto.email);
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
@@ -29,13 +36,16 @@ export class AuthService {
 
     const payload = { email: user.email, sub: user.id, role: user.role };
 
+    const { passwordHash, ...userWithoutPassword } = user;
+
     return {
-      access_token: this.jwtService.sign(payload, {
-        expiresIn: (this.configService.get<string>('JWT_EXPIRATION') || '15m') as any,
+      accessToken: this.jwtService.sign(payload, {
+        expiresIn: (this.configService.get<string>('JWT_EXPIRATION') || '15m') as "15m",
       }),
-      refresh_token: this.jwtService.sign(payload, {
-        expiresIn: (this.configService.get<string>('REFRESH_TOKEN_EXPIRATION') || '7d') as any,
+      refreshToken: this.jwtService.sign(payload, {
+        expiresIn: (this.configService.get<string>('REFRESH_TOKEN_EXPIRATION') || '7d') as "7d",
       }),
+      user: userWithoutPassword,
     };
   }
 }

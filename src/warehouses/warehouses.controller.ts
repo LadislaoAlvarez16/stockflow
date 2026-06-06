@@ -3,32 +3,32 @@ import { WarehousesService } from './warehouses.service';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 @Controller('warehouses')
 export class WarehousesController {
   constructor(private readonly warehousesService: WarehousesService) {}
 
   @Post()
-  @Roles(Role.ADMIN)
+  @Roles(UserRole.ADMIN)
   create(@Body() createWarehouseDto: CreateWarehouseDto) {
     return this.warehousesService.create(createWarehouseDto);
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.OPERATOR, Role.VIEWER)
+  @Roles(UserRole.ADMIN, UserRole.OPERATOR, UserRole.VIEWER)
   findAll() {
     return this.warehousesService.findAll();
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.OPERATOR, Role.VIEWER)
+  @Roles(UserRole.ADMIN, UserRole.OPERATOR, UserRole.VIEWER)
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.warehousesService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN)
+  @Roles(UserRole.ADMIN)
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateWarehouseDto: UpdateWarehouseDto,
@@ -37,7 +37,7 @@ export class WarehousesController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN)
+  @Roles(UserRole.ADMIN)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.warehousesService.remove(id);
   }
