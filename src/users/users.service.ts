@@ -10,7 +10,7 @@ export class UsersService {
 
   async create(
     createUserDto: CreateUserDto,
-  ): Promise<Omit<User, 'passwordHash'>> {
+  ): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'>> {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: createUserDto.email },
     });
@@ -33,8 +33,21 @@ export class UsersService {
       },
     });
 
-    const { passwordHash: _, ...result } = user;
+    const { passwordHash: _ph, refreshTokenHash: _rth, ...result } = user;
     return result;
+  }
+
+  async findById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+    });
+  }
+
+  async updateRefreshTokenHash(id: string, hash: string | null): Promise<void> {
+    await this.prisma.user.update({
+      where: { id },
+      data: { refreshTokenHash: hash },
+    });
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -43,10 +56,10 @@ export class UsersService {
     });
   }
 
-  async findAll(): Promise<Omit<User, 'passwordHash'>[]> {
+  async findAll(): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'>[]> {
     const users = await this.prisma.user.findMany();
     return users.map((user) => {
-      const { passwordHash: _, ...result } = user;
+      const { passwordHash: _ph, refreshTokenHash: _rth, ...result } = user;
       return result;
     });
   }
