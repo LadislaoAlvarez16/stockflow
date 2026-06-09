@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, ParseUUIDPipe } from '@nestjs/common';
 import { WarehousesService } from './warehouses.service';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
@@ -16,13 +16,11 @@ export class WarehousesController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.OPERATOR, UserRole.VIEWER)
   findAll() {
     return this.warehousesService.findAll();
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.OPERATOR, UserRole.VIEWER)
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.warehousesService.findOne(id);
   }
@@ -36,9 +34,10 @@ export class WarehousesController {
     return this.warehousesService.update(id, updateWarehouseDto);
   }
 
-  @Delete(':id')
+  @Patch(':id/deactivate')
   @Roles(UserRole.ADMIN)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.warehousesService.remove(id);
+  deactivate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.warehousesService.deactivate(id);
   }
 }
+

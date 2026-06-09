@@ -65,6 +65,15 @@ model User {
   @@map("users")
 }
 
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("categories")
+}
+
 model Product {
   id        String   @id @default(uuid()) @db.Uuid
   sku       String   @unique
@@ -85,8 +94,10 @@ model Product {
 model Warehouse {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
+  code      String   @unique @default(uuid())
   location  String
   manager   String?
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
