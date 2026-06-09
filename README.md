@@ -31,6 +31,19 @@
 $ npm install
 ```
 
+## Credenciales de Demo y Desarrollo
+
+Al clonar el proyecto, puedes ejecutar el script de seeding para poblar la base de datos con un usuario administrador funcional. Las credenciales pueden configurarse en tu archivo `.env`. Si no se proveen, el sistema utilizará los siguientes valores por defecto:
+
+- **Email:** `admin@stockflow.local`
+- **Password:** `admin123`
+
+Para ejecutar el seed, utiliza:
+
+```bash
+$ npm run seed
+```
+
 ## Compile and run the project
 
 ```bash

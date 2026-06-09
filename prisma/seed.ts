@@ -1,33 +1,28 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = 'admin@stockflow.com';
+  const email = process.env.INITIAL_ADMIN_EMAIL || 'admin@stockflow.local';
+  const plainPassword = process.env.INITIAL_ADMIN_PASSWORD || 'admin123';
   
-  // Verificamos si el admin ya existe
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: adminEmail },
+  const saltOrRounds = 10;
+  const passwordHash = await bcrypt.hash(plainPassword, saltOrRounds);
+
+  const adminUser = await prisma.user.upsert({
+    where: { email },
+    update: {}, // Empty update ensures idempotency without overwriting manual user modifications
+    create: {
+      email,
+      passwordHash,
+      name: 'Administrador Maestro',
+      role: UserRole.ADMIN,
+      isActive: true,
+    },
   });
 
-  if (!existingAdmin) {
-    const saltOrRounds = 10;
-    const passwordHash = await bcrypt.hash('admin123', saltOrRounds);
-
-    await prisma.user.create({
-      data: {
-        email: adminEmail,
-        passwordHash: passwordHash,
-        role: 'ADMIN',
-        isActive: true,
-      },
-    });
-
-    console.log('✅ Admin user created successfully');
-  } else {
-    console.log('⚡ Admin user already exists');
-  }
+  console.log(`[Seed] Admin user created/verified: ${adminUser.email}`);
 }
 
 main()
