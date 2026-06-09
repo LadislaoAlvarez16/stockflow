@@ -37,7 +37,18 @@ export class UsersService {
     return result;
   }
 
-  async findById(id: string): Promise<User | null> {
+  async findById(
+    id: string,
+  ): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'> | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+    if (!user) return null;
+    const { passwordHash: _ph, refreshTokenHash: _rth, ...result } = user;
+    return result;
+  }
+
+  async findFullById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({
       where: { id },
     });

@@ -1,13 +1,18 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, NotFoundException } from '@nestjs/common';
 import { AuthService, LoginResponse } from './auth.service';
+import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
+import { User } from '@prisma/client';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {}
 
   @Public()
   @Post('login')
@@ -27,5 +32,16 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@CurrentUser() user: JwtPayload): Promise<void> {
     return this.authService.logout(user.id);
+  }
+
+  @Get('me')
+  async getProfile(
+    @CurrentUser() user: JwtPayload,
+  ): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'>> {
+    const profile = await this.usersService.findById(user.id);
+    if (!profile) {
+      throw new NotFoundException('User not found');
+    }
+    return profile;
   }
 }

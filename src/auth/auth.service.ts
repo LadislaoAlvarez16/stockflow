@@ -69,7 +69,7 @@ export class AuthService {
       throw new UnauthorizedException('Access denied');
     }
 
-    const user = await this.usersService.findById(payload.sub);
+    const user = await this.usersService.findFullById(payload.sub);
     if (!user || !user.isActive || !user.refreshTokenHash) {
       throw new UnauthorizedException('Access denied');
     }
