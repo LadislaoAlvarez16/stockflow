@@ -164,6 +164,6 @@ export class StockService {
       });
     }
 
-    return movement;
+    return { movement, stockAfter: newQuantity };
   }
 }

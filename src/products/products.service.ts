@@ -55,6 +55,7 @@ export class ProductsService {
         SELECT p.id
         FROM products p
         LEFT JOIN stocks s ON p.id = s.product_id
+        WHERE p.min_stock > 0
         GROUP BY p.id, p.min_stock
         HAVING COALESCE(SUM(s.quantity), 0) <= p.min_stock
       `;
