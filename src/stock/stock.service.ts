@@ -4,6 +4,7 @@ import { MovementType, Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
+import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 
 @Injectable()
 export class StockService {
@@ -84,6 +85,94 @@ export class StockService {
       if (error instanceof BadRequestException) throw error;
       console.error('[StockService.createTransfer] Transaction failed:', error);
       throw new InternalServerErrorException('Failed to process stock transfer');
+    }
+  }
+
+  async createAdjustment(dto: CreateAdjustmentDto, userId: string) {
+    const transactionId = uuidv4();
+
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Lock pesimista en stocks
+        const stockLock = await tx.$queryRaw<{ quantity: number }[]>`
+          SELECT quantity 
+          FROM stocks 
+          WHERE product_id = ${dto.productId}::uuid 
+            AND warehouse_id = ${dto.warehouseId}::uuid 
+          FOR UPDATE
+        `;
+
+        let currentQuantity = 0;
+        if (stockLock.length > 0) {
+          currentQuantity = Number(stockLock[0].quantity);
+        }
+
+        // 2. Validación en memoria
+        if (dto.operation === 'SUBTRACT') {
+          if (currentQuantity - dto.quantity < 0) {
+            throw new BadRequestException('El ajuste resultaría en stock negativo');
+          }
+        }
+
+        const newQuantity = dto.operation === 'ADD' 
+          ? currentQuantity + dto.quantity 
+          : currentQuantity - dto.quantity;
+
+        // 3. Crear movimiento inmutable
+        const notesWithPrefix = `[${dto.operation}] ${dto.notes}`;
+        
+        const movement = await tx.stockMovement.create({
+          data: {
+            productId: dto.productId,
+            warehouseId: dto.warehouseId,
+            type: MovementType.ADJUSTMENT,
+            quantity: dto.quantity,
+            reference: `ADJ-${transactionId.split('-')[0]}`,
+            notes: notesWithPrefix,
+            transactionId,
+            createdById: userId,
+            correctsMovementId: dto.correctsMovementId,
+          },
+        });
+
+        // 4. Materialización
+        if (dto.operation === 'SUBTRACT') {
+          await tx.stock.update({
+            where: {
+              productId_warehouseId: {
+                productId: dto.productId,
+                warehouseId: dto.warehouseId,
+              },
+            },
+            data: {
+              quantity: { decrement: dto.quantity },
+            },
+          });
+        } else {
+          await tx.stock.upsert({
+            where: {
+              productId_warehouseId: {
+                productId: dto.productId,
+                warehouseId: dto.warehouseId,
+              },
+            },
+            create: {
+              productId: dto.productId,
+              warehouseId: dto.warehouseId,
+              quantity: dto.quantity,
+            },
+            update: {
+              quantity: { increment: dto.quantity },
+            },
+          });
+        }
+
+        return { movement, stockAfter: newQuantity };
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      console.error('[StockService.createAdjustment] Transaction failed:', error);
+      throw new InternalServerErrorException('Failed to process stock adjustment');
     }
   }
 
