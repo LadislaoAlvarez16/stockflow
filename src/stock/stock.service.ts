@@ -107,11 +107,9 @@ export class StockService {
     `;
 
     let currentQuantity = 0;
-    let isNewStock = true;
 
     if (stockLock.length > 0) {
       currentQuantity = Number(stockLock[0].quantity);
-      isNewStock = false;
     }
 
     // 2. Calcular nueva cantidad en base al tipo de movimiento.
@@ -143,26 +141,23 @@ export class StockService {
       },
     });
 
-    // 5. Materializar la proyección en la tabla stocks (Upsert/Update)
-    if (isNewStock) {
-      await tx.stock.create({
-        data: {
+    // 5. Materializar la proyección en la tabla stocks mediante UPSERT nativo
+    await tx.stock.upsert({
+      where: {
+        productId_warehouseId: {
           productId: dto.productId,
           warehouseId: dto.warehouseId,
-          quantity: newQuantity,
         },
-      });
-    } else {
-      await tx.stock.update({
-        where: {
-          productId_warehouseId: {
-            productId: dto.productId,
-            warehouseId: dto.warehouseId,
-          },
-        },
-        data: { quantity: newQuantity },
-      });
-    }
+      },
+      create: {
+        productId: dto.productId,
+        warehouseId: dto.warehouseId,
+        quantity: newQuantity,
+      },
+      update: {
+        quantity: newQuantity,
+      },
+    });
 
     return { movement, stockAfter: newQuantity };
   }
