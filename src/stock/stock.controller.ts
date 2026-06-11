@@ -41,6 +41,12 @@ export class StockController {
     return this.stockService.createAdjustment(dto, req.user.id);
   }
 
+  @Get('audit')
+  @Roles('ADMIN')
+  async getAuditDiscrepancies() {
+    return this.stockService.getAuditDiscrepancies();
+  }
+
   @Get('movements')
   async getMovements(@Query() filters: GetMovementsFiltersDto) {
     return this.stockService.getMovements(filters);

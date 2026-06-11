@@ -8,6 +8,13 @@ import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { GetStockFiltersDto } from './dto/get-stock-filters.dto';
 import { GetMovementsFiltersDto } from './dto/get-movements-filters.dto';
 
+interface AuditDiscrepancyRaw {
+  productId: string;
+  warehouseId: string;
+  expectedQuantity: number;
+  actualQuantity: number;
+}
+
 @Injectable()
 export class StockService {
   constructor(private readonly prisma: PrismaService) {}
@@ -305,6 +312,53 @@ export class StockService {
         },
       };
     }
+  }
+
+  async getAuditDiscrepancies() {
+    const discrepanciesRaw = await this.prisma.$queryRaw<AuditDiscrepancyRaw[]>`
+      SELECT 
+        sm.product_id AS "productId", 
+        sm.warehouse_id AS "warehouseId", 
+        SUM(
+          CASE 
+            WHEN sm.type = 'INBOUND' THEN sm.quantity
+            WHEN sm.type = 'OUTBOUND' THEN -sm.quantity
+            WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[ADD]%' THEN sm.quantity
+            WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[SUBTRACT]%' THEN -sm.quantity
+            ELSE 0
+          END
+        ) AS "expectedQuantity",
+        COALESCE(s.quantity, 0) AS "actualQuantity"
+      FROM stock_movements sm
+      LEFT JOIN stocks s ON sm.product_id = s.product_id AND sm.warehouse_id = s.warehouse_id
+      GROUP BY sm.product_id, sm.warehouse_id, s.quantity
+      HAVING SUM(
+        CASE 
+          WHEN sm.type = 'INBOUND' THEN sm.quantity
+          WHEN sm.type = 'OUTBOUND' THEN -sm.quantity
+          WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[ADD]%' THEN sm.quantity
+          WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[SUBTRACT]%' THEN -sm.quantity
+          ELSE 0
+        END
+      ) != COALESCE(s.quantity, 0)
+    `;
+
+    const discrepancies = discrepanciesRaw.map((row) => {
+      const expected = Number(row.expectedQuantity);
+      const actual = Number(row.actualQuantity);
+      return {
+        productId: row.productId,
+        warehouseId: row.warehouseId,
+        expectedQuantity: expected,
+        actualQuantity: actual,
+        difference: actual - expected,
+      };
+    });
+
+    return {
+      consistent: discrepancies.length === 0,
+      discrepancies,
+    };
   }
 
   async getStock(productId: string, warehouseId: string) {
