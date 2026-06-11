@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { QueryProductDto } from './dto/query-product.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 
@@ -17,8 +18,8 @@ export class ProductsController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.OPERATOR, UserRole.VIEWER)
-  findAll() {
-    return this.productsService.findAll();
+  findAll(@Query() query: QueryProductDto) {
+    return this.productsService.findAll(query);
   }
 
   @Get(':id')
@@ -36,9 +37,13 @@ export class ProductsController {
     return this.productsService.update(id, updateProductDto);
   }
 
-  @Delete(':id')
+  @Patch(':id/deactivate')
   @Roles(UserRole.ADMIN)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.productsService.remove(id);
+  deactivate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.productsService.deactivate(id);
   }
+
+  // Soft-delete handled by deactivate, but keeping Delete for convention if needed, or remove it entirely.
+  // The requirement says: "Nunca eliminar un producto físicamente... El endpoint de borrado será PATCH /products/:id/deactivate".
+  // So we replace @Delete with just the deactivate endpoint to strictly follow BR-PRODUCT-SOFT-DELETE.
 }

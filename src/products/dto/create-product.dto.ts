@@ -17,5 +17,5 @@ export class CreateProductDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  reorderPoint?: number;
+  minStock?: number;
 }

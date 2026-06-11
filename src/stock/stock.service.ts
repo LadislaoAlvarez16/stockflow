@@ -32,6 +32,23 @@ export class StockService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Total Order of Locks para prevenir deadlocks.
+        // Ordenamos los almacenes alfanuméricamente para asegurar que las
+        // transacciones concurrentes siempre adquieran los bloqueos en el mismo orden.
+        const sortedWarehouses = [dto.fromWarehouseId, dto.toWarehouseId].sort();
+
+        // Aplicamos el pre-bloqueo pesimista determinístico.
+        for (const wId of sortedWarehouses) {
+          await tx.$queryRaw`
+            SELECT 1 
+            FROM stocks 
+            WHERE product_id = ${dto.productId}::uuid 
+              AND warehouse_id = ${wId}::uuid 
+            FOR UPDATE
+          `;
+        }
+
+        // Una vez asegurados los locks jerárquicos, ejecutamos los movimientos de manera segura.
         // OUTBOUND from source
         await this.executeMovementLogic(tx, {
           productId: dto.productId,
@@ -80,7 +97,7 @@ export class StockService {
       throw new BadRequestException('Quantity must be strictly positive');
     }
 
-    // 1. Lock the specific stock row to prevent race conditions
+    // 1. Re-afirmar o asegurar el bloqueo pesimista de la fila específica (Row Exclusive Lock).
     const stockLock = await tx.$queryRaw<{ quantity: number }[]>`
       SELECT quantity 
       FROM stocks 
@@ -97,7 +114,7 @@ export class StockService {
       isNewStock = false;
     }
 
-    // 2. Calculate new quantity based on movement type
+    // 2. Calcular nueva cantidad en base al tipo de movimiento.
     let newQuantity = currentQuantity;
     if (dto.type === MovementType.INBOUND) {
       newQuantity += dto.quantity;
@@ -107,11 +124,12 @@ export class StockService {
       throw new BadRequestException('Use explicit INBOUND/OUTBOUND for adjustments in this context');
     }
 
+    // 3. Validar atomicidad: Si queda negativo, forzamos BadRequest para hacer rollback automático
     if (newQuantity < 0) {
       throw new BadRequestException(`Insufficient stock. Current: ${currentQuantity}, Requested: ${dto.quantity}`);
     }
 
-    // 3. Insert immutable movement
+    // 4. Insertar en el ledger inmutable (StockMovement)
     const movement = await tx.stockMovement.create({
       data: {
         productId: dto.productId,
@@ -125,7 +143,7 @@ export class StockService {
       },
     });
 
-    // 4. Upsert materialized stock
+    // 5. Materializar la proyección en la tabla stocks (Upsert/Update)
     if (isNewStock) {
       await tx.stock.create({
         data: {
