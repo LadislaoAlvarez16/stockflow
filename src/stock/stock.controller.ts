@@ -4,6 +4,7 @@ import { CreateMovementDto } from './dto/create-movement.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { GetStockFiltersDto } from './dto/get-stock-filters.dto';
+import { GetMovementsFiltersDto } from './dto/get-movements-filters.dto';
 // Wait, the imports use '../common/guards/jwt-auth.guard' and '../common/guards/roles.guard'. 
 // I need to check if jwt-auth.guard exists, but the user requested this explicitly.
 // Actually, in NestJS, if Auth/JWT is implemented globally, maybe we don't need UseGuards.
@@ -38,6 +39,11 @@ export class StockController {
   @Roles('ADMIN')
   async createAdjustment(@Body() dto: CreateAdjustmentDto, @Request() req: any) {
     return this.stockService.createAdjustment(dto, req.user.id);
+  }
+
+  @Get('movements')
+  async getMovements(@Query() filters: GetMovementsFiltersDto) {
+    return this.stockService.getMovements(filters);
   }
 
   @Get()

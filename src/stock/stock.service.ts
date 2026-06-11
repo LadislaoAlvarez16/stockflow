@@ -6,6 +6,7 @@ import { CreateMovementDto } from './dto/create-movement.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { GetStockFiltersDto } from './dto/get-stock-filters.dto';
+import { GetMovementsFiltersDto } from './dto/get-movements-filters.dto';
 
 @Injectable()
 export class StockService {
@@ -175,6 +176,75 @@ export class StockService {
       console.error('[StockService.createAdjustment] Transaction failed:', error);
       throw new InternalServerErrorException('Failed to process stock adjustment');
     }
+  }
+
+  async getMovements(filters: GetMovementsFiltersDto) {
+    const limit = filters.limit || 50;
+    
+    // Configurar fechas por defecto si no vienen
+    let dateFrom = filters.dateFrom;
+    let dateTo = filters.dateTo;
+
+    if (!dateTo) {
+      dateTo = new Date();
+    }
+
+    if (!dateFrom) {
+      const thirtyDaysAgo = new Date(dateTo);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      dateFrom = thirtyDaysAgo;
+    }
+
+    // Firewall: El rango de fechas no puede superar los 60 días
+    const diffTime = Math.abs(dateTo.getTime() - dateFrom.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 60) {
+      throw new BadRequestException('El rango de fechas no puede superar los 60 días para proteger el rendimiento del sistema');
+    }
+
+    const where: Prisma.StockMovementWhereInput = {
+      createdAt: {
+        gte: dateFrom,
+        lte: dateTo,
+      },
+    };
+
+    if (filters.productId) where.productId = filters.productId;
+    if (filters.warehouseId) where.warehouseId = filters.warehouseId;
+    if (filters.transactionId) where.transactionId = filters.transactionId;
+    if (filters.type) where.type = filters.type;
+
+    const data = await this.prisma.stockMovement.findMany({
+      where,
+      take: limit + 1,
+      skip: filters.cursor ? 1 : undefined,
+      cursor: filters.cursor ? { id: filters.cursor } : undefined,
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' }
+      ],
+      include: {
+        product: { select: { sku: true, name: true } },
+        warehouse: { select: { name: true } },
+        createdBy: { select: { name: true, email: true } }
+      }
+    });
+
+    const hasNextPage = data.length > limit;
+    if (hasNextPage) {
+      data.pop(); // Remover el extra record
+    }
+
+    const nextCursor = hasNextPage ? data[data.length - 1].id : null;
+
+    return {
+      data,
+      meta: {
+        nextCursor,
+        hasNextPage
+      }
+    };
   }
 
   async getStocks(filters: GetStockFiltersDto) {
