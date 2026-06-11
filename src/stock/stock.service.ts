@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
+import { GetStockFiltersDto } from './dto/get-stock-filters.dto';
 
 @Injectable()
 export class StockService {
@@ -173,6 +174,66 @@ export class StockService {
       if (error instanceof BadRequestException) throw error;
       console.error('[StockService.createAdjustment] Transaction failed:', error);
       throw new InternalServerErrorException('Failed to process stock adjustment');
+    }
+  }
+
+  async getStocks(filters: GetStockFiltersDto) {
+    const { productId, warehouseId } = filters;
+    const where: Prisma.StockWhereInput = {};
+
+    if (productId) {
+      where.productId = productId;
+    }
+    if (warehouseId) {
+      where.warehouseId = warehouseId;
+    }
+
+    const include = {
+      product: { select: { id: true, sku: true, name: true } },
+      warehouse: { select: { id: true, name: true } },
+    };
+
+    if (productId) {
+      // Ignorar paginación
+      const [data, total] = await Promise.all([
+        this.prisma.stock.findMany({ where, include }),
+        this.prisma.stock.count({ where }),
+      ]);
+
+      return {
+        data,
+        meta: {
+          total,
+          page: 1,
+          limit: total > 0 ? total : 1,
+          totalPages: 1,
+        },
+      };
+    } else {
+      // Aplicar paginación por offset
+      const page = filters.page || 1;
+      const limit = filters.limit || 50;
+      const skip = (page - 1) * limit;
+
+      const [data, total] = await Promise.all([
+        this.prisma.stock.findMany({
+          where,
+          include,
+          skip,
+          take: limit,
+        }),
+        this.prisma.stock.count({ where }),
+      ]);
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
     }
   }
 
