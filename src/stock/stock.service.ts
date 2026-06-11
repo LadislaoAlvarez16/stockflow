@@ -38,14 +38,23 @@ export class StockService {
         const sortedWarehouses = [dto.fromWarehouseId, dto.toWarehouseId].sort();
 
         // Aplicamos el pre-bloqueo pesimista determinístico.
+        let originStockQuantity = 0;
         for (const wId of sortedWarehouses) {
-          await tx.$queryRaw`
-            SELECT 1 
+          const result = await tx.$queryRaw<{ quantity: number }[]>`
+            SELECT quantity 
             FROM stocks 
             WHERE product_id = ${dto.productId}::uuid 
               AND warehouse_id = ${wId}::uuid 
             FOR UPDATE
           `;
+          
+          if (wId === dto.fromWarehouseId && result.length > 0) {
+            originStockQuantity = Number(result[0].quantity);
+          }
+        }
+
+        if (originStockQuantity < dto.quantity) {
+          throw new BadRequestException('Insufficient stock in origin warehouse');
         }
 
         // Una vez asegurados los locks jerárquicos, ejecutamos los movimientos de manera segura.
