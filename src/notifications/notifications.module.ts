@@ -4,15 +4,13 @@ import { BullModule } from '@nestjs/bullmq';
 @Module({
   imports: [
     BullModule.registerQueue({
-      name: 'alerts',
+      name: 'notifications',
       defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
-        removeOnComplete: 100,
-        removeOnFail: 50,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 5000 },
       },
     }),
   ],
   exports: [BullModule],
 })
-export class AlertsModule {}
+export class NotificationsModule {}

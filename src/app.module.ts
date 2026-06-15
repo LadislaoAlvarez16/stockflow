@@ -15,9 +15,13 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { CategoriesModule } from './categories/categories.module';
+import { QueueModule } from './queue/queue.module';
+import { NotificationsModule } from './notifications/notifications.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    QueueModule,
     AuthModule,
     UsersModule,
     ProductsModule,
@@ -25,6 +29,7 @@ import { CategoriesModule } from './categories/categories.module';
     StockModule,
     ImportsModule,
     AlertsModule,
+    NotificationsModule,
     DashboardModule,
     CommonModule,
     CategoriesModule,
