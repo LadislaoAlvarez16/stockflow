@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MovementType, Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,6 +7,9 @@ import { CreateTransferDto } from './dto/create-transfer.dto';
 import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { GetStockFiltersDto } from './dto/get-stock-filters.dto';
 import { GetMovementsFiltersDto } from './dto/get-movements-filters.dto';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { CheckLowStockJob } from '../queue/interfaces/check-low-stock.job';
 
 interface AuditDiscrepancyRaw {
   productId: string;
@@ -17,15 +20,35 @@ interface AuditDiscrepancyRaw {
 
 @Injectable()
 export class StockService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(StockService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue('alerts') private alertsQueue: Queue,
+  ) {}
 
   async createMovement(dto: CreateMovementDto, userId: string) {
     const transactionId = uuidv4();
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         return this.executeMovementLogic(tx, dto, userId, transactionId);
       });
+
+      if (dto.type === MovementType.OUTBOUND) {
+        await this.alertsQueue.add('check-low-stock', {
+          productId: dto.productId,
+          warehouseId: dto.warehouseId,
+          currentQuantity: result.stockAfter,
+          minStock: result.minStock,
+        });
+        this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`);
+      }
+
+      return {
+        movement: result.movement,
+        stockAfter: result.stockAfter,
+      };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       console.error('[StockService.createMovement] Transaction failed:', error);
@@ -41,7 +64,7 @@ export class StockService {
     const transactionId = uuidv4();
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         // Total Order of Locks para prevenir deadlocks.
         // Ordenamos los almacenes alfanuméricamente para asegurar que las
         // transacciones concurrentes siempre adquieran los bloqueos en el mismo orden.
@@ -69,7 +92,7 @@ export class StockService {
 
         // Una vez asegurados los locks jerárquicos, ejecutamos los movimientos de manera segura.
         // OUTBOUND from source
-        await this.executeMovementLogic(tx, {
+        const originResult = await this.executeMovementLogic(tx, {
           productId: dto.productId,
           warehouseId: dto.fromWarehouseId,
           type: MovementType.OUTBOUND,
@@ -88,8 +111,19 @@ export class StockService {
           notes: dto.notes,
         }, userId, transactionId);
 
-        return { transactionId, status: 'SUCCESS' };
+        return { transactionId, status: 'SUCCESS', minStockOrigin: originResult.minStock, stockAfterOrigin: originResult.stockAfter };
       });
+
+      // Fuera de la transacción encolamos la alerta para el depósito de origen
+      await this.alertsQueue.add('check-low-stock', {
+        productId: dto.productId,
+        warehouseId: dto.fromWarehouseId,
+        currentQuantity: result.stockAfterOrigin,
+        minStock: result.minStockOrigin,
+      });
+      this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.fromWarehouseId}`);
+
+      return { transactionId: result.transactionId, status: result.status };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       console.error('[StockService.createTransfer] Transaction failed:', error);
@@ -101,7 +135,7 @@ export class StockService {
     const transactionId = uuidv4();
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         // 1. Lock pesimista en stocks
         const stockLock = await tx.$queryRaw<{ quantity: number }[]>`
           SELECT quantity 
@@ -176,8 +210,26 @@ export class StockService {
           });
         }
 
-        return { movement, stockAfter: newQuantity };
+        // 5. Fetch minStock para la cola
+        const product = await tx.product.findUnique({
+          where: { id: dto.productId },
+          select: { minStock: true },
+        });
+
+        return { movement, stockAfter: newQuantity, minStock: product ? Number(product.minStock) : 0 };
       });
+
+      if (dto.operation === 'SUBTRACT') {
+        await this.alertsQueue.add('check-low-stock', {
+          productId: dto.productId,
+          warehouseId: dto.warehouseId,
+          currentQuantity: result.stockAfter,
+          minStock: result.minStock,
+        });
+        this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`);
+      }
+
+      return { movement: result.movement, stockAfter: result.stockAfter };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       console.error('[StockService.createAdjustment] Transaction failed:', error);
@@ -442,6 +494,12 @@ export class StockService {
       },
     });
 
-    return { movement, stockAfter: newQuantity };
+    // 6. Obtener minStock desde Product de forma segura (sin afectar SELECT FOR UPDATE de stocks)
+    const product = await tx.product.findUnique({
+      where: { id: dto.productId },
+      select: { minStock: true },
+    });
+
+    return { movement, stockAfter: newQuantity, minStock: product ? Number(product.minStock) : 0 };
   }
 }
