@@ -1,111 +1,179 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+<div align="center">
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# StockFlow
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+**Sistema de control de inventario multi-depósito con trazabilidad inmutable, automatización y arquitectura de nivel producción.**
 
-## Description
+Proyecto de portfolio técnico — no es un tutorial de CRUD, es un sistema diseñado como lo usaría una distribuidora real.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+[![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 
-## Project setup
+[Demo en vivo](#) · [Documentación técnica](./docs) · [Decisiones de arquitectura](./docs/DECISIONS.md)
 
-```bash
-$ npm install
+</div>
+
+---
+
+## El problema
+
+Las distribuidoras medianas (50–5.000 SKUs, 2–10 depósitos) todavía manejan su inventario en Excel y WhatsApp. El resultado es siempre el mismo: el stock del sistema no coincide con el stock físico, nadie sabe por qué, y un reclamo de faltante no tiene respuesta técnica posible.
+
+**StockFlow resuelve esto con un principio simple y no negociable: el stock nunca se modifica directamente. Todo cambio es un movimiento registrado e inmutable.**
+
+```
+stock_movements   →   fuente de verdad, inmutable, nunca se edita ni se borra
+stocks             →   proyección materializada, lectura instantánea
 ```
 
-## Credenciales de Demo y Desarrollo
+Ambas tablas se escriben en la **misma transacción de PostgreSQL**. Si algo falla, no queda nada a medias.
 
-Al clonar el proyecto, puedes ejecutar el script de seeding para poblar la base de datos con un usuario administrador funcional. Las credenciales pueden configurarse en tu archivo `.env`. Si no se proveen, el sistema utilizará los siguientes valores por defecto:
+---
 
-- **Email:** `admin@stockflow.local`
-- **Password:** `admin123`
+## Por qué este proyecto es distinto a un CRUD
 
-Para ejecutar el seed, utiliza:
+| Decisión técnica | Lo que demuestra |
+|---|---|
+| Historial inmutable + proyección materializada en la misma transacción | Entender consistencia de datos sin caer en over-engineering (no es event sourcing completo) |
+| `SELECT FOR UPDATE` en operaciones concurrentes de stock | Manejo real de condiciones de carrera, no solo el happy path |
+| Transferencias = 2 movimientos atómicos con `transaction_id` compartido | Diseño de dominio correcto: el stock no se teletransporta entre tablas |
+| ETL en chunks de 100 filas, nunca una transacción gigante | Conocimiento de cómo un import masivo puede tumbar la API si se hace mal |
+| Pipeline de alertas con BullMQ + cron de fallback | Automatización real, con deduplicación y reintentos, no un `setInterval` |
+| Cada decisión arquitectónica está documentada con su trade-off | Capacidad de explicar **por qué**, no solo **qué** |
 
-```bash
-$ npm run seed
+Cada una de estas decisiones está justificada por escrito en [`docs/DECISIONS.md`](./docs/DECISIONS.md), incluyendo las alternativas que se descartaron y por qué.
+
+---
+
+## Stack
+
+| Capa | Tecnología | Por qué |
+|------|-----------|---------|
+| Backend | NestJS + TypeScript strict | Arquitectura modular, DI, sin `any` |
+| ORM | Prisma | Type-safety end-to-end, migraciones versionadas |
+| Base de datos | PostgreSQL 15 | Transacciones ACID, locks a nivel fila |
+| Cache / Queues | Redis + BullMQ | Jobs asíncronos con reintentos y backoff |
+| Auth | JWT + refresh rotation | Sin sesiones server-side, stateless |
+| Autorización | RBAC (admin / operator / viewer) | Permisos por endpoint, no por pantalla |
+| ETL | SheetJS + pipeline de validación por fila | Imports masivos que no fallan todo por un error |
+| Infra | Docker Compose | api + postgres + redis + worker, un comando |
+| Testing | Jest + Supertest | Unit + integración con DB real |
+
+---
+
+## Arquitectura en una imagen
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│     api      │────▶│  postgres    │     │    redis     │
+│   (NestJS)   │     │  (fuente de  │     │  (queues +   │
+│              │     │   verdad)    │     │   cache)     │
+└──────┬───────┘     └──────────────┘     └──────┬───────┘
+       │                                          │
+       │              ┌──────────────┐            │
+       └─────────────▶│    worker    │◀───────────┘
+                       │  (BullMQ)    │
+                       └──────────────┘
 ```
 
-## Compile and run the project
+Monolito modular. Sin microservicios, sin CQRS, sin event sourcing enterprise — decisiones conscientes documentadas en [`DECISIONS.md`](./docs/DECISIONS.md), no atajos.
 
-```bash
-# development
-$ npm run start
+---
 
-# watch mode
-$ npm run start:dev
+## El motor de stock — la pieza central
 
-# production mode
-$ npm run start:prod
+```typescript
+// Toda operación de stock pasa por una transacción atómica
+await prisma.$transaction(async (tx) => {
+  // 1. Lock a nivel fila — previene condiciones de carrera
+  await tx.$executeRaw`SELECT quantity FROM stocks 
+    WHERE product_id = ${productId} AND warehouse_id = ${warehouseId} 
+    FOR UPDATE`;
+
+  // 2. Validar stock disponible antes de cualquier egreso
+  if (current.quantity < quantity) {
+    throw new BadRequestException('Insufficient stock');
+  }
+
+  // 3. INSERT inmutable — el historial nunca se edita
+  await tx.stockMovement.create({ data: { type, quantity, ...} });
+
+  // 4. UPSERT en la proyección — misma transacción, consistencia garantizada
+  await tx.stock.upsert({ where: {...}, update: {...}, create: {...} });
+});
 ```
 
-## Run tests
+Una transferencia entre depósitos genera **exactamente dos movimientos atómicos**, nunca uno:
 
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+```
+DEP_A → DEP_B
+  1. OUTBOUND en DEP_A  ┐  misma transacción
+  2. INBOUND  en DEP_B  ┘  mismo transaction_id
 ```
 
-## Deployment
+Si cualquiera de los dos falla, ninguno se registra. El stock nunca queda "a medias".
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Documentación técnica completa
+
+Este proyecto está documentado como si lo fuera a mantener un equipo, no solo yo:
+
+| Documento | Qué encontrás |
+|-----------|----------------|
+| [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Capas, módulos, flujo de requests |
+| [`DATA_MODEL.md`](./docs/DATA_MODEL.md) | Entidades, relaciones, índices justificados uno por uno |
+| [`BUSINESS_RULES.md`](./docs/BUSINESS_RULES.md) | 13 reglas de negocio con contexto, condición y código |
+| [`DECISIONS.md`](./docs/DECISIONS.md) | Qué se eligió, qué se descartó, y por qué — con trade-offs explícitos |
+| [`API.md`](./docs/API.md) | Todos los endpoints REST con permisos por rol |
+| [`AUTOMATION.md`](./docs/AUTOMATION.md) | Queues BullMQ, workers, cron jobs |
+| [`GUARDRAILS.md`](./docs/GUARDRAILS.md) | Reglas arquitectónicas que no se negocian |
+| [`TESTING.md`](./docs/TESTING.md) | Qué se testea y por qué (no todo, lo que duele si se rompe) |
+| [`ROADMAP.md`](./docs/ROADMAP.md) | Fases del proyecto, qué está hecho y qué falta |
+
+---
+
+## Levantar el proyecto localmente
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+git clone https://github.com/tu-usuario/stockflow.git
+cd stockflow
+
+cp .env.example .env
+
+docker-compose up -d        # postgres + redis + worker
+
+npm install
+npx prisma migrate dev
+npm run seed                 # datos de demo realistas
+
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+API disponible en `http://localhost:3000/api/v1`  
+Panel de queues (Bull Board) en `http://localhost:3000/admin/queues`
 
-## Resources
+---
 
-Check out a few resources that may come in handy when working with NestJS:
+## Estado del proyecto
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+- [x] **Fase 1 — Core** — Auth, RBAC, motor de stock, ETL, dashboard básico
+- [x] **Fase 2 — Automatización** — BullMQ, alertas automáticas, notificaciones por email, cron jobs
+- [ ] **Fase 3 — Trazabilidad avanzada** — Lotes, vencimientos, inventario físico, reportes exportables
+- [ ] **Fase 4 — SaaS** — Multi-tenant, billing, integraciones externas
 
-## Support
+Ver el detalle completo en [`ROADMAP.md`](./docs/ROADMAP.md).
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+---
 
-## Stay in touch
+## Sobre este proyecto
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Lo construí para demostrar cómo pienso un sistema backend cuando el dominio importa: no solo "que funcione", sino que sea auditable, consistente bajo concurrencia, y mantenible por alguien que no sea yo.
 
-## License
+Cada decisión técnica relevante está documentada con su alternativa descartada — eso es a propósito. Quiero que se entienda el razonamiento, no solo el resultado.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+**Contacto:** [LinkedIn](#) · [Email](#)
