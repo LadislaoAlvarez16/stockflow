@@ -39,12 +39,35 @@ export const outOfStockTemplate = (data: {
   `;
 };
 
-export const dailyReportTemplate = (data: any) => {
+export const dailyReportTemplate = (data: {
+  activeAlertsCount: number;
+  recentMovementsCount: number;
+  recentMovements: Array<{ id: string; type: string; quantity: number; productId: string }>;
+}) => {
+  const movementsHtml = data.recentMovements.length > 0
+    ? data.recentMovements.map(m => `<li>${m.type} de ${m.quantity} unidad(es) (Prod: ${m.productId})</li>`).join('')
+    : '<li>No hubo movimientos relevantes.</li>';
+
   return `
     <div style="font-family: sans-serif; padding: 20px; color: #333;">
       <h2 style="color: #2563eb;">📊 Reporte Diario de Stock</h2>
-      <p>Este es un resumen de las operaciones del día (MOCK).</p>
-      <p>Próximamente se incluirán las métricas reales de movimientos y transferencias.</p>
+      <p>Este es el resumen de las operaciones de las últimas 24 horas.</p>
+      
+      <div style="margin-top: 20px; padding: 15px; border-left: 4px solid #d97706; background-color: #fef3c7;">
+        <h3 style="margin: 0; color: #b45309;">Alertas Críticas Activas</h3>
+        <p style="font-size: 18px; font-weight: bold; margin-top: 10px;">Total: ${data.activeAlertsCount}</p>
+      </div>
+
+      <div style="margin-top: 20px; padding: 15px; border-left: 4px solid #2563eb; background-color: #eff6ff;">
+        <h3 style="margin: 0; color: #1d4ed8;">Actividad Reciente</h3>
+        <p>Total de movimientos en las últimas 24hs: <strong>${data.recentMovementsCount}</strong></p>
+        <h4>Últimos registros destacados:</h4>
+        <ul>
+          ${movementsHtml}
+        </ul>
+      </div>
+
+      <p style="margin-top: 30px; font-size: 12px; color: #666;">Notificación generada automáticamente por StockFlow.</p>
     </div>
   `;
 };

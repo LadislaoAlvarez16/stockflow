@@ -17,10 +17,12 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { CategoriesModule } from './categories/categories.module';
 import { QueueModule } from './queue/queue.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     QueueModule,
     AuthModule,
     UsersModule,
