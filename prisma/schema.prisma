@@ -48,11 +48,11 @@ enum JobStatus {
 }
 
 model User {
-  id           String    @id @default(uuid()) @db.Uuid
-  email        String    @unique
-  name         String    @default("Operador")
-  passwordHash String    @map("password_hash")
-  role         UserRole  @default(VIEWER)
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique
+  name             String    @default("Operador")
+  passwordHash     String    @map("password_hash")
+  role             UserRole  @default(VIEWER)
   isActive         Boolean   @default(true) @map("is_active")
   refreshTokenHash String?   @map("refresh_token_hash")
   lastLoginAt      DateTime? @map("last_login_at")
@@ -61,6 +61,7 @@ model User {
 
   stockMovements StockMovement[]
   importJobs     ImportJob[]
+  resolvedAlerts Alert[]
 
   @@map("users")
 }
@@ -181,16 +182,20 @@ model ImportJob {
 }
 
 model Alert {
-  id          String      @id @default(uuid()) @db.Uuid
-  productId   String      @map("product_id") @db.Uuid
-  warehouseId String      @map("warehouse_id") @db.Uuid
-  type        AlertType
-  status      AlertStatus @default(ACTIVE)
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  id           String      @id @default(uuid()) @db.Uuid
+  productId    String      @map("product_id") @db.Uuid
+  warehouseId  String      @map("warehouse_id") @db.Uuid
+  type         AlertType
+  status       AlertStatus @default(ACTIVE)
+  message      String
+  resolvedAt   DateTime?   @map("resolved_at")
+  resolvedById String?     @map("resolved_by_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  product   Product   @relation(fields: [productId], references: [id])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  product    Product   @relation(fields: [productId], references: [id])
+  warehouse  Warehouse @relation(fields: [warehouseId], references: [id])
+  resolvedBy User?     @relation(fields: [resolvedById], references: [id])
 
   @@map("alerts")
 }
