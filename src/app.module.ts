@@ -18,6 +18,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { QueueModule } from './queue/queue.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { DebugModule } from './common/debug/debug.module';
 
 @Module({
   imports: [
@@ -31,10 +32,11 @@ import { ScheduleModule } from '@nestjs/schedule';
     StockModule,
     ImportsModule,
     AlertsModule,
-    NotificationsModule,
     DashboardModule,
     CommonModule,
     CategoriesModule,
+    NotificationsModule,
+    DebugModule,
   ],
   controllers: [AppController],
   providers: [

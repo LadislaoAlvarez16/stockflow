@@ -42,11 +42,21 @@ export const outOfStockTemplate = (data: {
 export const dailyReportTemplate = (data: {
   activeAlertsCount: number;
   recentMovementsCount: number;
-  recentMovements: Array<{ id: string; type: string; quantity: number; productId: string }>;
+  movementsByType: Array<{ type: string; count: number }>;
+  newAlerts: Array<{ productId: string; type: string }>;
+  topProducts: Array<{ productId: string; count: number }>;
 }) => {
-  const movementsHtml = data.recentMovements.length > 0
-    ? data.recentMovements.map(m => `<li>${m.type} de ${m.quantity} unidad(es) (Prod: ${m.productId})</li>`).join('')
+  const movementsHtml = data.movementsByType.length > 0
+    ? data.movementsByType.map(m => `<li>${m.type}: <strong>${m.count}</strong> operación(es)</li>`).join('')
     : '<li>No hubo movimientos relevantes.</li>';
+
+  const newAlertsHtml = data.newAlerts.length > 0
+    ? data.newAlerts.map(a => `<li>Prod ID: ${a.productId} (${a.type})</li>`).join('')
+    : '<li>Ninguna nueva alerta en las últimas 24hs.</li>';
+
+  const topProductsHtml = data.topProducts.length > 0
+    ? data.topProducts.map(p => `<li>Prod ID: ${p.productId} - <strong>${p.count}</strong> movimiento(s)</li>`).join('')
+    : '<li>Sin datos.</li>';
 
   return `
     <div style="font-family: sans-serif; padding: 20px; color: #333;">
@@ -55,16 +65,18 @@ export const dailyReportTemplate = (data: {
       
       <div style="margin-top: 20px; padding: 15px; border-left: 4px solid #d97706; background-color: #fef3c7;">
         <h3 style="margin: 0; color: #b45309;">Alertas Críticas Activas</h3>
-        <p style="font-size: 18px; font-weight: bold; margin-top: 10px;">Total: ${data.activeAlertsCount}</p>
+        <p style="font-size: 18px; font-weight: bold; margin-top: 10px;">Total Históricas: ${data.activeAlertsCount}</p>
+        <h4>Nuevas en las últimas 24hs:</h4>
+        <ul>${newAlertsHtml}</ul>
       </div>
 
       <div style="margin-top: 20px; padding: 15px; border-left: 4px solid #2563eb; background-color: #eff6ff;">
         <h3 style="margin: 0; color: #1d4ed8;">Actividad Reciente</h3>
         <p>Total de movimientos en las últimas 24hs: <strong>${data.recentMovementsCount}</strong></p>
-        <h4>Últimos registros destacados:</h4>
-        <ul>
-          ${movementsHtml}
-        </ul>
+        <h4>Desglose por Tipo:</h4>
+        <ul>${movementsHtml}</ul>
+        <h4>Top 5 Productos más movidos:</h4>
+        <ul>${topProductsHtml}</ul>
       </div>
 
       <p style="margin-top: 30px; font-size: 12px; color: #666;">Notificación generada automáticamente por StockFlow.</p>
