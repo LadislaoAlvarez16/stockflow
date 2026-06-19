@@ -14,6 +14,10 @@ interface SendEmailPayload {
   message?: string;
   to?: string[];
   subject?: string;
+  // Daily report fields
+  activeAlertsCount?: number;
+  recentMovementsCount?: number;
+  recentMovements?: Array<{ id: string; type: string; quantity: number; productId: string }>;
 }
 
 @Processor('notifications')
@@ -45,7 +49,7 @@ export class NotificationsWorker extends WorkerHost {
         subject = subject || `¡QUIEBRE DE STOCK! - Producto ${payload.productId}`;
         break;
       case 'daily-report':
-        html = dailyReportTemplate(payload);
+        html = dailyReportTemplate(payload as any);
         subject = subject || 'Resumen Diario de Operaciones';
         break;
       default:

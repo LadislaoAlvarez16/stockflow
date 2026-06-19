@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { AlertsService } from './alerts.service';
 import { AlertsController } from './alerts.controller';
 import { AlertsWorker } from './workers/alerts.worker';
+import { AlertsCronService } from './alerts.cron';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from '../common/common.module';
 
@@ -21,7 +22,7 @@ import { CommonModule } from '../common/common.module';
     }),
   ],
   controllers: [AlertsController],
-  providers: [AlertsService, AlertsWorker],
+  providers: [AlertsService, AlertsWorker, AlertsCronService],
   exports: [BullModule, AlertsService],
 })
 export class AlertsModule {}
