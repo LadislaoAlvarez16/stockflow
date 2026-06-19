@@ -17,7 +17,9 @@ interface SendEmailPayload {
   // Daily report fields
   activeAlertsCount?: number;
   recentMovementsCount?: number;
-  recentMovements?: Array<{ id: string; type: string; quantity: number; productId: string }>;
+  movementsByType?: Array<{ type: string; count: number }>;
+  newAlerts?: Array<{ productId: string; type: string }>;
+  topProducts?: Array<{ productId: string; count: number }>;
 }
 
 @Processor('notifications')

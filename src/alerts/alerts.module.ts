@@ -6,11 +6,13 @@ import { AlertsWorker } from './workers/alerts.worker';
 import { AlertsCronService } from './alerts.cron';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from '../common/common.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
 
 @Module({
   imports: [
     CommonModule,
     NotificationsModule,
+    DashboardModule,
     BullModule.registerQueue({
       name: 'alerts',
       defaultJobOptions: {
@@ -23,6 +25,6 @@ import { CommonModule } from '../common/common.module';
   ],
   controllers: [AlertsController],
   providers: [AlertsService, AlertsWorker, AlertsCronService],
-  exports: [BullModule, AlertsService],
+  exports: [BullModule, AlertsService, AlertsCronService],
 })
 export class AlertsModule {}
