@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { ConfigModule } from '@nestjs/config';
+import { MailService } from './mail.service';
+import { NotificationsWorker } from './workers/notifications.worker';
 
 @Module({
   imports: [
+    ConfigModule,
     BullModule.registerQueue({
       name: 'notifications',
       defaultJobOptions: {
@@ -11,6 +15,7 @@ import { BullModule } from '@nestjs/bullmq';
       },
     }),
   ],
-  exports: [BullModule],
+  providers: [MailService, NotificationsWorker],
+  exports: [BullModule, MailService],
 })
 export class NotificationsModule {}
