@@ -24,7 +24,7 @@ import { DashboardModule } from '../dashboard/dashboard.module';
     }),
   ],
   controllers: [AlertsController],
-  providers: [AlertsService, AlertsWorker, AlertsCronService],
-  exports: [BullModule, AlertsService, AlertsCronService],
+  providers: [AlertsService, AlertsWorker],
+  exports: [BullModule, AlertsService],
 })
 export class AlertsModule {}

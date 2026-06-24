@@ -1,71 +1,65 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { AlertStatus } from '@prisma/client';
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDailySummary() {
-    const twentyFourHoursAgo = new Date();
-    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+  async getSummary() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Inicio del día local
 
-    // 1. Total de movimientos en las ultimas 24hs
-    const recentMovementsCount = await this.prisma.stockMovement.count({
-      where: { createdAt: { gte: twentyFourHoursAgo } },
-    });
-
-    // 2. Movimientos desglosados por tipo
-    const movementsByTypeRaw = await this.prisma.stockMovement.groupBy({
-      by: ['type'],
-      _count: {
-        id: true,
-      },
-      where: { createdAt: { gte: twentyFourHoursAgo } },
-    });
-    
-    const movementsByType = movementsByTypeRaw.map(m => ({
-      type: m.type,
-      count: m._count.id,
-    }));
-
-    // 3. Alertas criticas activas (historicas)
-    const activeAlertsCount = await this.prisma.alert.count({
-      where: { status: AlertStatus.ACTIVE },
-    });
-
-    // 4. Productos que cruzaron el mínimo (alertas creadas ultimas 24h)
-    const newAlertsRaw = await this.prisma.alert.findMany({
-      where: { createdAt: { gte: twentyFourHoursAgo } },
-      select: { productId: true, type: true },
-    });
-    const newAlerts = newAlertsRaw.map(a => ({ productId: a.productId, type: a.type }));
-
-    // 5. Top 5 productos con más movimientos
-    const topProductsRaw = await this.prisma.stockMovement.groupBy({
-      by: ['productId'],
-      _count: {
-        id: true,
-      },
-      where: { createdAt: { gte: twentyFourHoursAgo } },
-      orderBy: {
-        _count: {
-          id: 'desc',
-        },
-      },
-      take: 5,
-    });
-    const topProducts = topProductsRaw.map(p => ({
-      productId: p.productId,
-      count: p._count.id,
-    }));
+    const [activeProducts, activeWarehouses, todayMovements, lowStockResult] = await Promise.all([
+      this.prisma.product.count({ where: { isActive: true } }),
+      this.prisma.warehouse.count({ where: { isActive: true } }),
+      this.prisma.stockMovement.count({ where: { createdAt: { gte: today } } }),
+      // Raw query requerida por limitación de Prisma para comparar columnas de distintas tablas
+      this.prisma.$queryRaw<{count: bigint}[]>`
+        SELECT COUNT(*)::bigint
+        FROM stocks s
+        JOIN products p ON s.product_id = p.id
+        WHERE s.quantity <= p.min_stock 
+        AND p.is_active = true
+      `
+    ]);
 
     return {
-      activeAlertsCount,
-      recentMovementsCount,
-      movementsByType,
-      newAlerts,
-      topProducts,
+      activeProducts,
+      activeWarehouses,
+      todayMovements,
+      lowStockCount: Number(lowStockResult[0]?.count || 0)
     };
+  }
+
+  async getRecentMovements() {
+    return this.prisma.stockMovement.findMany({
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        product: { select: { sku: true, name: true } },
+        warehouse: { select: { name: true } },
+        createdBy: { select: { name: true } }
+      }
+    });
+  }
+
+  async getLowStock() {
+    // Raw query por la misma limitación descrita arriba
+    return this.prisma.$queryRaw`
+      SELECT 
+        s.quantity as "currentQuantity",
+        p.min_stock as "minStock",
+        p.name as "productName",
+        p.sku as "sku",
+        w.name as "warehouseName"
+      FROM stocks s
+      JOIN products p ON s.product_id = p.id
+      JOIN warehouses w ON s.warehouse_id = w.id
+      WHERE s.quantity <= p.min_stock
+      AND p.is_active = true
+      AND w.is_active = true
+      ORDER BY (s.quantity / NULLIF(p.min_stock, 0)) ASC
+      LIMIT 20
+    `;
   }
 }
