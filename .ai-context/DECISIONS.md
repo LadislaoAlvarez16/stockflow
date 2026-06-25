@@ -185,3 +185,21 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 4. **Role-Based Access Control (RBAC) dual:**
    - **Decisión:** En vistas mutacionales (como resolver alertas), el frontend parsea y consume activamente el rol inyectado del payload JWT para ocultar proactivamente botones de acción al rol `VIEWER`.
    - **Por qué:** Mantiene la UI limpia e intuitiva. Es exclusivamente una mejora de User Experience (UX), asumiendo que la seguridad real, ineludible y obligatoria corre por cuenta de los decoradores (`@Roles`) en los Guard de NestJS.
+
+---
+
+## 013 - Preparación para Despliegue en Producción (Semana 3)
+
+**Fecha:** 2026-06-25  
+**Contexto:** Necesitábamos containerizar el backend (`stockflow-api`) para subirlo a un entorno Cloud (Railway) de forma segura y liviana, asegurando que pudiera comunicarse exclusivamente con el frontend en un dominio distinto.
+
+**Decisiones:**
+1. **Dockerfile Multi-Stage:**
+   - **Decisión:** Se creó un Dockerfile de dos etapas (`builder` y `production`) partiendo de `node:20-alpine`. La imagen final copia únicamente `/dist`, `/node_modules` y la carpeta `/prisma`.
+   - **Por qué:** Reduce drásticamente el peso de la imagen y la superficie de ataque, lo cual acelera los tiempos de deploy (spin-up de contenedores) en entornos Serverless/PaaS.
+2. **Migraciones Automatizadas en el Arranque:**
+   - **Decisión:** El comando principal del contenedor (`CMD`) ejecuta obligatoriamente `npx prisma migrate deploy` antes de invocar a `node dist/main`.
+   - **Por qué:** Asegura que antes de que el servidor NestJS acepte una sola request de tráfico, la base de datos ya haya actualizado su estructura y schema, evitando crasheos o desincronización de modelos en producción.
+3. **CORS Condicional por Entorno:**
+   - **Decisión:** Se habilitó el CORS en `main.ts` utilizando como restricción de origen la variable `FRONTEND_URL`. Si esta no existe, se mantiene `origin: '*'`.
+   - **Por qué:** Es un approach pragmático: blinda la seguridad en producción (Railway) forzando estrictamente el handshake de orígenes, pero mantiene retrocompatibilidad y fricción nula para desarrollo local.
