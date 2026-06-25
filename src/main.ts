@@ -11,6 +11,11 @@ import { Queue } from 'bullmq';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
+  const frontendUrl = process.env.FRONTEND_URL;
+  app.enableCors({
+    origin: frontendUrl || '*',
+  });
+
   app.useGlobalFilters(new PrismaExceptionFilter());
 
   // Fail fast: Verify Bull Board credentials
