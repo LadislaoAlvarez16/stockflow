@@ -75,9 +75,9 @@ export class AlertsCronService {
   async handleDailyReport() {
     this.logger.log('Iniciando recopilación de datos para reporte diario...');
 
-    const summary = await this.dashboardService.getDailySummary();
+    const summary = await this.dashboardService.getSummary();
 
-    if (summary.activeAlertsCount === 0 && summary.recentMovementsCount === 0) {
+    if (summary.lowStockCount === 0 && summary.todayMovements === 0) {
       this.logger.debug('No hay alertas activas ni movimientos recientes. Reporte omitido.');
       return;
     }

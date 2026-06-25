@@ -307,7 +307,7 @@ export class StockService {
   }
 
   async getStocks(filters: GetStockFiltersDto) {
-    const { productId, warehouseId } = filters;
+    const { productId, warehouseId, search, lowStock } = filters;
     const where: Prisma.StockWhereInput = {};
 
     if (productId) {
@@ -315,6 +315,43 @@ export class StockService {
     }
     if (warehouseId) {
       where.warehouseId = warehouseId;
+    }
+
+    if (search) {
+      where.product = {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { sku: { contains: search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    if (lowStock) {
+      const lowStockPairs = await this.prisma.$queryRaw<{product_id: string, warehouse_id: string}[]>`
+        SELECT s.product_id, s.warehouse_id 
+        FROM stocks s 
+        JOIN products p ON s.product_id = p.id 
+        WHERE s.quantity <= p.min_stock
+      `;
+
+      if (lowStockPairs.length === 0) {
+        return {
+          data: [],
+          meta: { 
+            total: 0, 
+            page: filters.page || 1, 
+            limit: filters.limit || 50, 
+            totalPages: 0 
+          }
+        };
+      }
+
+      (where as any).productId_warehouseId = {
+        in: lowStockPairs.map(p => ({
+          productId: p.product_id,
+          warehouseId: p.warehouse_id
+        }))
+      };
     }
 
     const include = {

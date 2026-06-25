@@ -22,4 +22,11 @@ export class GetStockFiltersDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  @IsOptional()
+  search?: string;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  lowStock?: boolean;
 }
