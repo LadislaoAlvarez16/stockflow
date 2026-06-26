@@ -4,176 +4,118 @@
 
 **Sistema de control de inventario multi-depósito con trazabilidad inmutable, automatización y arquitectura de nivel producción.**
 
-Proyecto de portfolio técnico — no es un tutorial de CRUD, es un sistema diseñado como lo usaría una distribuidora real.
+Proyecto de portfolio técnico — no es un tutorial de CRUD, es un sistema diseñado para tolerar alta concurrencia y proteger la integridad de los datos como lo usaría una distribuidora real.
 
 [![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat&logo=prisma&logoColor=white)](https://www.prisma.io/)
-[![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 
-[Demo en vivo](#) · [Documentación técnica](./docs) · [Decisiones de arquitectura](./docs/DECISIONS.md)
+[Decisiones de arquitectura](./.ai-context/DECISIONS.md)
 
 </div>
 
 ---
 
-## El problema
+## 🎯 ¿Qué es StockFlow?
 
-Las distribuidoras medianas (50–5.000 SKUs, 2–10 depósitos) todavía manejan su inventario en Excel y WhatsApp. El resultado es siempre el mismo: el stock del sistema no coincide con el stock físico, nadie sabe por qué, y un reclamo de faltante no tiene respuesta técnica posible.
+StockFlow es un backend y motor transaccional construido para resolver el problema clásico de las distribuidoras: la discrepancia entre el stock físico y el del sistema. 
 
-**StockFlow resuelve esto con un principio simple y no negociable: el stock nunca se modifica directamente. Todo cambio es un movimiento registrado e inmutable.**
-
-```
-stock_movements   →   fuente de verdad, inmutable, nunca se edita ni se borra
-stocks             →   proyección materializada, lectura instantánea
-```
-
-Ambas tablas se escriben en la **misma transacción de PostgreSQL**. Si algo falla, no queda nada a medias.
+**Su principio no negociable:** El stock nunca se modifica directamente (no hay `UPDATE stock SET quantity = ...`). Todo cambio de inventario es un **movimiento registrado e inmutable**. 
 
 ---
 
-## Por qué este proyecto es distinto a un CRUD
+## ✨ Características (Fase 1 Completada)
 
-| Decisión técnica | Lo que demuestra |
-|---|---|
-| Historial inmutable + proyección materializada en la misma transacción | Entender consistencia de datos sin caer en over-engineering (no es event sourcing completo) |
-| `SELECT FOR UPDATE` en operaciones concurrentes de stock | Manejo real de condiciones de carrera, no solo el happy path |
-| Transferencias = 2 movimientos atómicos con `transaction_id` compartido | Diseño de dominio correcto: el stock no se teletransporta entre tablas |
-| ETL en chunks de 100 filas, nunca una transacción gigante | Conocimiento de cómo un import masivo puede tumbar la API si se hace mal |
-| Pipeline de alertas con BullMQ + cron de fallback | Automatización real, con deduplicación y reintentos, no un `setInterval` |
-| Cada decisión arquitectónica está documentada con su trade-off | Capacidad de explicar **por qué**, no solo **qué** |
-
-Cada una de estas decisiones está justificada por escrito en [`docs/DECISIONS.md`](./docs/DECISIONS.md), incluyendo las alternativas que se descartaron y por qué.
+- **Auth & RBAC Dual:** Autenticación sin estado (Stateless JWT) con tres roles estrictos (`ADMIN`, `OPERATOR`, `VIEWER`). Los permisos se chequean criptográficamente sin asediar a la base de datos por cada request.
+- **Motor de Stock Inmutable:** Las operaciones de inventario se gestionan a través de transacciones ACID.
+- **ABM de Catálogos:** Gestión integral de Productos y Depósitos con "soft-deletes" para proteger la integridad referencial.
+- **Motor ETL Masivo:** Endpoint optimizado para ingesta masiva (Excel/CSV) con procesamiento ultra-rápido en memoria, map/reduce para validaciones O(1), y doble idempotencia.
+- **Dashboard Operativo:** Endpoints de métricas preparadas para dashboards analíticos.
 
 ---
 
-## Stack
+## 🏗️ Decisiones Arquitectónicas Clave
 
-| Capa | Tecnología | Por qué |
-|------|-----------|---------|
-| Backend | NestJS + TypeScript strict | Arquitectura modular, DI, sin `any` |
-| ORM | Prisma | Type-safety end-to-end, migraciones versionadas |
-| Base de datos | PostgreSQL 15 | Transacciones ACID, locks a nivel fila |
-| Cache / Queues | Redis + BullMQ | Jobs asíncronos con reintentos y backoff |
-| Auth | JWT + refresh rotation | Sin sesiones server-side, stateless |
-| Autorización | RBAC (admin / operator / viewer) | Permisos por endpoint, no por pantalla |
-| ETL | SheetJS + pipeline de validación por fila | Imports masivos que no fallan todo por un error |
-| Infra | Docker Compose | api + postgres + redis + worker, un comando |
-| Testing | Jest + Supertest | Unit + integración con DB real |
+Este proyecto está construido para demostrar madurez en la toma de decisiones técnicas (trade-offs):
 
----
+### 1. Ledger Inmutable (Tabla Doble)
+En lugar de mutar un campo `quantity`, StockFlow escribe en `stock_movements` (el historial inmutable) y proyecta el resultado en `stocks` (tabla materializada para lecturas rápidas) dentro de la **misma transacción de PostgreSQL**. Si ocurre un fallo, no queda nada a medias. Esto garantiza auditorías perfectas.
 
-## Arquitectura en una imagen
+### 2. Transacciones Atómicas y Concurrencia
+Se utiliza **Pessimistic Locking** (`SELECT ... FOR UPDATE`) a nivel fila en PostgreSQL durante las mutaciones de stock. Esto elimina de raíz las condiciones de carrera (Race Conditions) que ocurren cuando dos operadores intentan retirar la última unidad de un producto al mismo tiempo. Además, en operaciones multi-depósito (Transferencias), los locks se adquieren en orden alfanumérico para evitar *Deadlocks*.
 
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│     api      │────▶│  postgres    │     │    redis     │
-│   (NestJS)   │     │  (fuente de  │     │  (queues +   │
-│              │     │   verdad)    │     │   cache)     │
-└──────┬───────┘     └──────────────┘     └──────┬───────┘
-       │                                          │
-       │              ┌──────────────┐            │
-       └─────────────▶│    worker    │◀───────────┘
-                       │  (BullMQ)    │
-                       └──────────────┘
-```
-
-Monolito modular. Sin microservicios, sin CQRS, sin event sourcing enterprise — decisiones conscientes documentadas en [`DECISIONS.md`](./docs/DECISIONS.md), no atajos.
+### 3. Procesamiento ETL Seguro
+El importador masivo no lanza miles de queries a la base de datos ni carga a memoria arrays insostenibles. Utiliza un `Map` (HashMap) para resolver SKUs en tiempo constante `O(1)`, implementa un límite estricto de seguridad (1000 filas) y controla la **Idempotencia** (si subes el mismo remito dos veces, el sistema omite el segundo ingreso silenciosamente en lugar de duplicar el stock).
 
 ---
 
-## El motor de stock — la pieza central
+## 💻 Stack Tecnológico
 
-```typescript
-// Toda operación de stock pasa por una transacción atómica
-await prisma.$transaction(async (tx) => {
-  // 1. Lock a nivel fila — previene condiciones de carrera
-  await tx.$executeRaw`SELECT quantity FROM stocks 
-    WHERE product_id = ${productId} AND warehouse_id = ${warehouseId} 
-    FOR UPDATE`;
-
-  // 2. Validar stock disponible antes de cualquier egreso
-  if (current.quantity < quantity) {
-    throw new BadRequestException('Insufficient stock');
-  }
-
-  // 3. INSERT inmutable — el historial nunca se edita
-  await tx.stockMovement.create({ data: { type, quantity, ...} });
-
-  // 4. UPSERT en la proyección — misma transacción, consistencia garantizada
-  await tx.stock.upsert({ where: {...}, update: {...}, create: {...} });
-});
-```
-
-Una transferencia entre depósitos genera **exactamente dos movimientos atómicos**, nunca uno:
-
-```
-DEP_A → DEP_B
-  1. OUTBOUND en DEP_A  ┐  misma transacción
-  2. INBOUND  en DEP_B  ┘  mismo transaction_id
-```
-
-Si cualquiera de los dos falla, ninguno se registra. El stock nunca queda "a medias".
+| Tecnología | Rol en el ecosistema |
+|------------|----------------------|
+| **NestJS** | Framework core, aportando Inyección de Dependencias y arquitectura modular estricta. |
+| **Prisma** | ORM con tipado fuerte de extremo a extremo y gestión determinística de transacciones. |
+| **PostgreSQL** | Fuente de verdad absoluta. Transacciones ACID y bloqueos a nivel fila. |
+| **Docker** | Infraestructura reproducible. Despliegue de DB y API mediante `docker-compose`. |
 
 ---
 
-## Documentación técnica completa
+## 🚀 Guía de Inicio Rápido (Local)
 
-Este proyecto está documentado como si lo fuera a mantener un equipo, no solo yo:
+### Requisitos previos
+- Docker y Docker Compose instalados.
+- Node.js (v20+ recomendado).
 
-| Documento | Qué encontrás |
-|-----------|----------------|
-| [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Capas, módulos, flujo de requests |
-| [`DATA_MODEL.md`](./docs/DATA_MODEL.md) | Entidades, relaciones, índices justificados uno por uno |
-| [`BUSINESS_RULES.md`](./docs/BUSINESS_RULES.md) | 13 reglas de negocio con contexto, condición y código |
-| [`DECISIONS.md`](./docs/DECISIONS.md) | Qué se eligió, qué se descartó, y por qué — con trade-offs explícitos |
-| [`API.md`](./docs/API.md) | Todos los endpoints REST con permisos por rol |
-| [`AUTOMATION.md`](./docs/AUTOMATION.md) | Queues BullMQ, workers, cron jobs |
-| [`GUARDRAILS.md`](./docs/GUARDRAILS.md) | Reglas arquitectónicas que no se negocian |
-| [`TESTING.md`](./docs/TESTING.md) | Qué se testea y por qué (no todo, lo que duele si se rompe) |
-| [`ROADMAP.md`](./docs/ROADMAP.md) | Fases del proyecto, qué está hecho y qué falta |
+### Pasos de instalación
 
----
+1. **Clonar el repositorio y preparar el entorno:**
+   ```bash
+   git clone https://github.com/tu-usuario/stockflow.git
+   cd stockflow
+   cp .env.example .env
+   ```
 
-## Levantar el proyecto localmente
+2. **Levantar la infraestructura de base de datos:**
+   ```bash
+   docker-compose up -d
+   ```
 
-```bash
-git clone https://github.com/tu-usuario/stockflow.git
-cd stockflow
+3. **Instalar dependencias y preparar la base de datos:**
+   ```bash
+   npm install
+   npx prisma migrate dev
+   ```
 
-cp .env.example .env
+4. **Ejecutar el Seed (Datos de prueba iniciales):**
+   ```bash
+   npm run seed
+   ```
+   *Credenciales del usuario Administrador generadas por defecto:*
+   - **Email:** `admin@stockflow.local`
+   - **Password:** `admin123`
 
-docker-compose up -d        # postgres + redis + worker
-
-npm install
-npx prisma migrate dev
-npm run seed                 # datos de demo realistas
-
-npm run start:dev
-```
-
-API disponible en `http://localhost:3000/api/v1`  
-Panel de queues (Bull Board) en `http://localhost:3000/admin/queues`
-
----
-
-## Estado del proyecto
-
-- [x] **Fase 1 — Core** — Auth, RBAC, motor de stock, ETL, dashboard básico
-- [x] **Fase 2 — Automatización** — BullMQ, alertas automáticas, notificaciones por email, cron jobs
-- [ ] **Fase 3 — Trazabilidad avanzada** — Lotes, vencimientos, inventario físico, reportes exportables
-- [ ] **Fase 4 — SaaS** — Multi-tenant, billing, integraciones externas
-
-Ver el detalle completo en [`ROADMAP.md`](./docs/ROADMAP.md).
+5. **Iniciar el servidor en modo desarrollo:**
+   ```bash
+   npm run start:dev
+   ```
+   La API estará respondiendo en `http://localhost:3000`.
 
 ---
 
-## Sobre este proyecto
+## 📁 Estructura del Proyecto
 
-Lo construí para demostrar cómo pienso un sistema backend cuando el dominio importa: no solo "que funcione", sino que sea auditable, consistente bajo concurrencia, y mantenible por alguien que no sea yo.
+StockFlow sigue una arquitectura modular en **NestJS**. Cada dominio de negocio tiene su propio directorio autocontenido, facilitando a futuro una eventual extracción hacia microservicios:
 
-Cada decisión técnica relevante está documentada con su alternativa descartada — eso es a propósito. Quiero que se entienda el razonamiento, no solo el resultado.
+- `/src/auth` — Lógica de generación y validación de tokens Stateless.
+- `/src/stock` — El motor central de movimientos inmutables.
+- `/src/imports` — El pipeline ETL de procesamiento CSV masivo.
+- `/src/products` & `/src/warehouses` — ABM de catálogos maestros.
+- `/src/alerts` — Colas y notificaciones (BullMQ - Fase 2).
 
-**Contacto:** [LinkedIn](#) · [Email](#)
+---
+
+## 🗺️ Roadmap (Próximas Fases)
+- **Fase 2:** Automatización Asíncrona total (Workers BullMQ, notificaciones vía Email con resiliencia, Reportes programados).
+- **Fase 3:** Sistema FIFO estricto, Lotes y Fechas de Vencimiento para la industria de alimentos/farma.
