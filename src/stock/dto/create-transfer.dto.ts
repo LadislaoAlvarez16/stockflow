@@ -5,6 +5,10 @@ export class CreateTransferDto {
   productId: string;
 
   @IsUUID()
+  @IsOptional()
+  batchId?: string;
+
+  @IsUUID()
   fromWarehouseId: string;
 
   @IsUUID()

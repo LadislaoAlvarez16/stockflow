@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MovementType, Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,6 +28,9 @@ export class StockService {
   ) {}
 
   async createMovement(dto: CreateMovementDto, userId: string) {
+    if (dto.batchId) {
+      await this.validateBatch(dto.batchId, dto.productId);
+    }
     const transactionId = uuidv4();
 
     try {
@@ -61,6 +64,10 @@ export class StockService {
       throw new BadRequestException('Source and destination warehouses must be different');
     }
 
+    if (dto.batchId) {
+      await this.validateBatch(dto.batchId, dto.productId);
+    }
+
     const transactionId = uuidv4();
 
     try {
@@ -70,7 +77,7 @@ export class StockService {
         // transacciones concurrentes siempre adquieran los bloqueos en el mismo orden.
         const sortedWarehouses = [dto.fromWarehouseId, dto.toWarehouseId].sort();
 
-        // Aplicamos el pre-bloqueo pesimista determinístico.
+        // Aplicamos el pre-bloqueo pesimista determinístico sobre stocks.
         let originStockQuantity = 0;
         for (const wId of sortedWarehouses) {
           const result = await tx.$queryRaw<{ quantity: number }[]>`
@@ -90,6 +97,27 @@ export class StockService {
           throw new BadRequestException('Insufficient stock in origin warehouse');
         }
 
+        // Pre-bloqueo pesimista sobre batch_stocks en el mismo orden (si hay lote)
+        let originBatchQuantity = 0;
+        if (dto.batchId) {
+          for (const wId of sortedWarehouses) {
+            const batchResult = await tx.$queryRaw<{ quantity: number }[]>`
+              SELECT quantity 
+              FROM batch_stocks 
+              WHERE batch_id = ${dto.batchId}::uuid 
+                AND warehouse_id = ${wId}::uuid 
+              FOR UPDATE
+            `;
+            
+            if (wId === dto.fromWarehouseId && batchResult.length > 0) {
+              originBatchQuantity = Number(batchResult[0].quantity);
+            }
+          }
+          if (originBatchQuantity < dto.quantity) {
+            throw new BadRequestException('Insufficient batch stock in origin warehouse');
+          }
+        }
+
         // Una vez asegurados los locks jerárquicos, ejecutamos los movimientos de manera segura.
         // OUTBOUND from source
         const originResult = await this.executeMovementLogic(tx, {
@@ -99,6 +127,7 @@ export class StockService {
           quantity: dto.quantity,
           reference: `TRANSFER-OUT-${dto.reference}`,
           notes: dto.notes,
+          batchId: dto.batchId,
         }, userId, transactionId);
 
         // INBOUND to destination
@@ -109,6 +138,7 @@ export class StockService {
           quantity: dto.quantity,
           reference: `TRANSFER-IN-${dto.reference}`,
           notes: dto.notes,
+          batchId: dto.batchId,
         }, userId, transactionId);
 
         return { transactionId, status: 'SUCCESS', minStockOrigin: originResult.minStock, stockAfterOrigin: originResult.stockAfter };
@@ -132,6 +162,9 @@ export class StockService {
   }
 
   async createAdjustment(dto: CreateAdjustmentDto, userId: string) {
+    if (dto.batchId) {
+      await this.validateBatch(dto.batchId, dto.productId);
+    }
     const transactionId = uuidv4();
 
     try {
@@ -459,6 +492,37 @@ export class StockService {
     return stock || { productId, warehouseId, quantity: 0 };
   }
 
+  async getStockByBatch(productId?: string, warehouseId?: string, batchId?: string, includeEmpty: boolean = false) {
+    const where: Prisma.BatchStockWhereInput = {};
+    
+    if (productId) where.batch = { productId };
+    if (warehouseId) where.warehouseId = warehouseId;
+    if (batchId) where.batchId = batchId;
+    if (!includeEmpty) where.quantity = { gt: 0 };
+
+    return this.prisma.batchStock.findMany({
+      where,
+      include: {
+        batch: true,
+        warehouse: { select: { id: true, name: true } }
+      },
+      orderBy: { batch: { expiryDate: { sort: 'asc', nulls: 'last' } } }
+    });
+  }
+
+  private async validateBatch(batchId: string, productId: string) {
+    const batch = await this.prisma.batch.findUnique({
+      where: { id: batchId },
+    });
+    if (!batch) {
+      throw new NotFoundException(`Batch ${batchId} not found`);
+    }
+    if (batch.productId !== productId) {
+      throw new BadRequestException(`Batch ${batchId} does not belong to product ${productId}`);
+    }
+    return batch;
+  }
+
   private async executeMovementLogic(
     tx: Prisma.TransactionClient, 
     dto: CreateMovementDto, 
@@ -479,24 +543,44 @@ export class StockService {
     `;
 
     let currentQuantity = 0;
-
     if (stockLock.length > 0) {
       currentQuantity = Number(stockLock[0].quantity);
     }
 
+    // 1.5. Bloqueo de lote si corresponde (Lock Hierarchy: stocks -> batch_stocks)
+    let currentBatchQuantity = 0;
+    if (dto.batchId) {
+      const batchLock = await tx.$queryRaw<{ quantity: number }[]>`
+        SELECT quantity 
+        FROM batch_stocks 
+        WHERE batch_id = ${dto.batchId}::uuid 
+          AND warehouse_id = ${dto.warehouseId}::uuid 
+        FOR UPDATE
+      `;
+      if (batchLock.length > 0) {
+        currentBatchQuantity = Number(batchLock[0].quantity);
+      }
+    }
+
     // 2. Calcular nueva cantidad en base al tipo de movimiento.
     let newQuantity = currentQuantity;
+    let newBatchQuantity = currentBatchQuantity;
     if (dto.type === MovementType.INBOUND) {
       newQuantity += dto.quantity;
+      if (dto.batchId) newBatchQuantity += dto.quantity;
     } else if (dto.type === MovementType.OUTBOUND) {
       newQuantity -= dto.quantity;
+      if (dto.batchId) newBatchQuantity -= dto.quantity;
     } else if (dto.type === MovementType.ADJUSTMENT) {
       throw new BadRequestException('Use explicit INBOUND/OUTBOUND for adjustments in this context');
     }
 
-    // 3. Validar atomicidad: Si queda negativo, forzamos BadRequest para hacer rollback automático
+    // 3. Validar atomicidad
     if (newQuantity < 0) {
       throw new BadRequestException(`Insufficient stock. Current: ${currentQuantity}, Requested: ${dto.quantity}`);
+    }
+    if (dto.batchId && newBatchQuantity < 0) {
+      throw new BadRequestException(`Insufficient batch stock. Current: ${currentBatchQuantity}, Requested: ${dto.quantity}`);
     }
 
     // 4. Insertar en el ledger inmutable (StockMovement)
@@ -510,6 +594,7 @@ export class StockService {
         notes: dto.notes,
         transactionId,
         createdById: userId,
+        batchId: dto.batchId,
       },
     });
 
@@ -531,12 +616,37 @@ export class StockService {
       },
     });
 
+    // 5.5 Materializar batch_stocks si corresponde
+    if (dto.batchId) {
+      await tx.batchStock.upsert({
+        where: {
+          batchId_warehouseId: {
+            batchId: dto.batchId,
+            warehouseId: dto.warehouseId,
+          },
+        },
+        create: {
+          batchId: dto.batchId,
+          warehouseId: dto.warehouseId,
+          quantity: newBatchQuantity,
+        },
+        update: {
+          quantity: newBatchQuantity,
+        },
+      });
+    }
+
     // 6. Obtener minStock desde Product de forma segura (sin afectar SELECT FOR UPDATE de stocks)
     const product = await tx.product.findUnique({
       where: { id: dto.productId },
       select: { minStock: true },
     });
 
-    return { movement, stockAfter: newQuantity, minStock: product ? Number(product.minStock) : 0 };
+    return { 
+      movement, 
+      stockAfter: newQuantity, 
+      minStock: product ? Number(product.minStock) : 0,
+      batchStockAfter: dto.batchId ? newBatchQuantity : undefined 
+    };
   }
 }

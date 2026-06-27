@@ -135,4 +135,26 @@ export class BatchesService {
       };
     });
   }
+
+  async suggestBatchForOutbound(productId: string, warehouseId: string, quantity: number) {
+    const batchStock = await this.prisma.batchStock.findFirst({
+      where: {
+        warehouseId,
+        quantity: { gte: quantity },
+        batch: { productId }
+      },
+      orderBy: {
+        batch: { expiryDate: { sort: 'asc', nulls: 'last' } }
+      },
+      include: {
+        batch: true
+      }
+    });
+
+    if (!batchStock) {
+      return null;
+    }
+
+    return batchStock.batch;
+  }
 }

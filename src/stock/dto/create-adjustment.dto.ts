@@ -5,6 +5,10 @@ export class CreateAdjustmentDto {
   productId: string;
 
   @IsUUID()
+  @IsOptional()
+  batchId?: string;
+
+  @IsUUID()
   warehouseId: string;
 
   @IsNumber()

@@ -6,6 +6,10 @@ export class CreateMovementDto {
   productId: string;
 
   @IsUUID()
+  @IsOptional()
+  batchId?: string;
+
+  @IsUUID()
   warehouseId: string;
 
   @IsEnum(MovementType)

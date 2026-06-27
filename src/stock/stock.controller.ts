@@ -17,11 +17,15 @@ import { Roles } from '../common/decorators/roles.decorator';
 // I will just use the user's provided code verbatim.
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { BatchesService } from '../batches/batches.service';
 
 @Controller('stock')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StockController {
-  constructor(private readonly stockService: StockService) {}
+  constructor(
+    private readonly stockService: StockService,
+    private readonly batchesService: BatchesService
+  ) {}
 
   @Post('movement')
   @Roles('ADMIN', 'OPERATOR')
@@ -50,6 +54,33 @@ export class StockController {
   @Get('movements')
   async getMovements(@Query() filters: GetMovementsFiltersDto) {
     return this.stockService.getMovements(filters);
+  }
+
+  @Get('fefo-suggestion')
+  @Roles('ADMIN', 'OPERATOR')
+  async getFefoSuggestion(
+    @Query('productId') productId: string,
+    @Query('warehouseId') warehouseId: string,
+    @Query('quantity') quantity: string,
+  ) {
+    const qty = Number(quantity);
+    const suggestedBatch = await this.batchesService.suggestBatchForOutbound(productId, warehouseId, qty);
+    return {
+      suggestedBatch,
+      reason: suggestedBatch ? 'FEFO policy applied' : 'No suitable batch found'
+    };
+  }
+
+  @Get('by-batch')
+  @Roles('ADMIN', 'OPERATOR', 'VIEWER')
+  async getStockByBatch(
+    @Query('productId') productId?: string,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('batchId') batchId?: string,
+    @Query('includeEmpty') includeEmpty?: string,
+  ) {
+    const parseIncludeEmpty = includeEmpty === 'true';
+    return this.stockService.getStockByBatch(productId, warehouseId, batchId, parseIncludeEmpty);
   }
 
   @Get()
