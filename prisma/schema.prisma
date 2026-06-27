@@ -89,6 +89,7 @@ model Product {
   stockMovements StockMovement[]
   stocks         Stock[]
   alerts         Alert[]
+  batches        Batch[]
 
   @@map("products")
 }
@@ -106,6 +107,7 @@ model Warehouse {
   stockMovements StockMovement[]
   stocks         Stock[]
   alerts         Alert[]
+  batchStocks    BatchStock[]
 
   @@map("warehouses")
 }
@@ -121,6 +123,7 @@ model StockMovement {
   transactionId      String?      @map("transaction_id") @db.Uuid
   createdById        String       @map("created_by_id") @db.Uuid
   correctsMovementId String?      @map("corrects_movement_id") @db.Uuid
+  batchId            String?      @map("batch_id") @db.Uuid
   createdAt          DateTime     @default(now()) @map("created_at")
 
   product          Product         @relation(fields: [productId], references: [id])
@@ -128,6 +131,7 @@ model StockMovement {
   createdBy        User            @relation(fields: [createdById], references: [id])
   correctsMovement StockMovement?  @relation("MovementCorrection", fields: [correctsMovementId], references: [id])
   correctedBy      StockMovement[] @relation("MovementCorrection")
+  batch            Batch?          @relation(fields: [batchId], references: [id])
 
   @@index([productId])
   @@index([warehouseId])
@@ -198,4 +202,42 @@ model Alert {
   resolvedBy User?     @relation(fields: [resolvedById], references: [id])
 
   @@map("alerts")
+}
+
+model Batch {
+  id                String    @id @default(uuid()) @db.Uuid
+  batchNumber       String    @map("batch_number")
+  productId         String    @map("product_id") @db.Uuid
+  supplierId        String?   @map("supplier_id")
+  expiryDate        DateTime? @map("expiry_date") @db.Date
+  manufacturingDate DateTime? @map("manufacturing_date") @db.Date
+  initialQuantity   Decimal   @map("initial_quantity") @db.Decimal(12, 4)
+  notes             String?
+  createdById       String    @map("created_by") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  product           Product   @relation(fields: [productId], references: [id])
+  movements         StockMovement[]
+  batchStocks       BatchStock[]
+
+  @@unique([productId, batchNumber])
+  @@index([productId])
+  @@index([expiryDate])
+  @@map("batches")
+}
+
+model BatchStock {
+  batchId     String   @map("batch_id") @db.Uuid
+  warehouseId String   @map("warehouse_id") @db.Uuid
+  quantity    Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  batch     Batch     @relation(fields: [batchId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@id([batchId, warehouseId])
+  @@index([warehouseId])
+  @@index([batchId])
+  @@map("batch_stocks")
 }

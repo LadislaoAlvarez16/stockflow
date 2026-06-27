@@ -19,6 +19,7 @@ import { QueueModule } from './queue/queue.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DebugModule } from './common/debug/debug.module';
+import { BatchesModule } from './batches/batches.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { DebugModule } from './common/debug/debug.module';
     ProductsModule,
     WarehousesModule,
     StockModule,
+    BatchesModule,
     ImportsModule,
     AlertsModule,
     DashboardModule,
