@@ -157,4 +157,93 @@ export class BatchesService {
 
     return batchStock.batch;
   }
+  async getExpiringBatches(daysThreshold: number = 30) {
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
+
+    const expiringBatchStocks = await this.prisma.batchStock.findMany({
+      where: {
+        quantity: { gt: 0 },
+        batch: {
+          expiryDate: { lte: thresholdDate },
+        },
+      },
+      include: {
+        batch: {
+          include: { product: { select: { id: true, name: true } } },
+        },
+        warehouse: { select: { id: true, name: true } },
+      },
+    });
+
+    // Agrupar en memoria por batch
+    const grouped = new Map<string, any>();
+
+    for (const bs of expiringBatchStocks) {
+      if (!grouped.has(bs.batchId)) {
+        grouped.set(bs.batchId, {
+          batch: {
+            id: bs.batch.id,
+            batchNumber: bs.batch.batchNumber,
+            expiryDate: bs.batch.expiryDate,
+            product: bs.batch.product,
+          },
+          totalQuantity: 0,
+          locations: [],
+        });
+      }
+
+      const group = grouped.get(bs.batchId);
+      const qty = Number(bs.quantity);
+      group.totalQuantity += qty;
+      group.locations.push({
+        warehouseId: bs.warehouseId,
+        name: bs.warehouse.name,
+        quantity: qty,
+      });
+    }
+
+    return Array.from(grouped.values());
+  }
+
+  async getMovements(batchId: string, page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.stockMovement.findMany({
+        where: { batchId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          warehouse: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.stockMovement.count({ where: { batchId } }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getSerialNumbers(batchId: string, page: number = 1, limit: number = 100, status?: any) {
+    const skip = (page - 1) * limit;
+    const where: any = { batchId };
+    
+    if (status) {
+      where.status = status;
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.serialNumber.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.serialNumber.count({ where }),
+    ]);
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
 }

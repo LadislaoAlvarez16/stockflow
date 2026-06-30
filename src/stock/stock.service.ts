@@ -733,4 +733,23 @@ export class StockService {
       batchStockAfter: dto.batchId ? newBatchQuantity : undefined 
     };
   }
+
+  async getBatchForMovement(movementId: string) {
+    const movement = await this.prisma.stockMovement.findUnique({
+      where: { id: movementId },
+      include: {
+        batch: {
+          include: {
+            product: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!movement) {
+      throw new NotFoundException(`Stock movement with ID ${movementId} not found`);
+    }
+
+    return movement.batch;
+  }
 }

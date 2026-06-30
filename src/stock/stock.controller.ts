@@ -56,6 +56,12 @@ export class StockController {
     return this.stockService.getMovements(filters);
   }
 
+  @Get('movements/:id/batch')
+  @Roles('ADMIN', 'OPERATOR', 'VIEWER')
+  async getBatchForMovement(@Param('id') id: string) {
+    return this.stockService.getBatchForMovement(id);
+  }
+
   @Get('fefo-suggestion')
   @Roles('ADMIN', 'OPERATOR')
   async getFefoSuggestion(
