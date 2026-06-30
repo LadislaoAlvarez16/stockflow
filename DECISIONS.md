@@ -15,7 +15,25 @@
    - Para no ensuciar el guard global o los decoradores nativos de NestJS con rutas estáticas del panel, inyectamos el `ExpressAdapter` junto a `express-basic-auth`.
    - Se aplicó una estrategia de *"Fail Fast"*: Si `BULL_BOARD_USER` o `BULL_BOARD_PASSWORD` no están explícitamente seteados, la aplicación entera hace `throw new Error()` en el bootstrap. Esto garantiza que es materialmente imposible pushear el panel a producción por accidente sin estar fuertemente bloqueado.
 
-## 012 - Arquitectura Síncrona de Vencimientos y Trazabilidad (Fase 3)
+## 012 - Motor de Stock Extendido con Trazabilidad de Lote (Fase 3)
+**Fecha:** 2026-06-27
+**Contexto:** Necesidad de extender el motor de stock existente para soportar trazabilidad por Lote (`batchId`), manteniendo la retrocompatibilidad con los movimientos sin lote.
+**Decisiones:**
+1. **Aditividad y Compatibilidad:**
+   - La columna `batchId` en `stock_movements` se definió como `nullable`. El sistema soporta operaciones atómicas híbridas: movimientos que afectan la proyección de inventario general (`stocks`) y opcionalmente una segunda proyección materializada de trazabilidad (`batch_stocks`).
+2. **Prevención de Deadlocks (Strict Locking Hierarchy):**
+   - Se extendió el bloqueo pesimista (`FOR UPDATE`) para asegurar primero la tabla general (`stocks`) y secuencialmente la tabla detallada (`batch_stocks`) en el mismo orden determinístico. Esto erradica el riesgo de deadlocks entre transacciones concurrentes.
+
+## 013 - Trazabilidad Unitaria por Números de Serie (Fase 3)
+**Fecha:** 2026-06-29
+**Contexto:** Integración de la entidad `SerialNumber` para trazar unidades físicas específicas desde su entrada (Inbound) hasta su salida (Outbound) o transferencia (Transfer).
+**Decisiones:**
+1. **Delegación Transaccional (`Prisma.TransactionClient`):**
+   - El servicio `SerialNumbersService` opera ciegamente bajo el cliente transaccional inyectado (`tx`). No inicializa sus propias transacciones para garantizar la atomicidad total: si un registro de serie falla, el movimiento de stock completo en `StockService` hace rollback.
+2. **Fail-Fast de Integridad:**
+   - Se inyectó una validación temprana en el `StockService` (`serialNumbers.length !== dto.quantity`). Esto aborta la operación antes de solicitar un solo Lock en base de datos, ahorrando recursos y latencia ante un Bad Request.
+
+## 014 - Arquitectura Síncrona de Vencimientos y Trazabilidad (Fase 3)
 **Fecha:** 2026-06-30
 **Contexto:** Integración del seguimiento de vencimientos de lotes y trazabilidad bidireccional (Fase 3). Se contemplaba inicialmente el uso de CRON jobs (ej. `@nestjs/schedule`) para monitorear lotes próximos a vencer.
 
