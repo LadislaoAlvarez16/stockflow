@@ -1,4 +1,4 @@
-import { IsUUID, IsEnum, IsNumber, IsPositive, IsString, MaxLength, IsOptional } from 'class-validator';
+import { IsUUID, IsEnum, IsNumber, IsPositive, IsString, MaxLength, IsOptional, IsArray, ArrayMaxSize } from 'class-validator';
 import { MovementType } from '@prisma/client';
 
 export class CreateMovementDto {
@@ -8,6 +8,12 @@ export class CreateMovementDto {
   @IsUUID()
   @IsOptional()
   batchId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  @ArrayMaxSize(1000)
+  serialNumbers?: string[];
 
   @IsUUID()
   warehouseId: string;

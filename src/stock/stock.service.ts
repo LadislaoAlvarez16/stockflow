@@ -10,6 +10,7 @@ import { GetMovementsFiltersDto } from './dto/get-movements-filters.dto';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { CheckLowStockJob } from '../queue/interfaces/check-low-stock.job';
+import { SerialNumbersService } from '../serial-numbers/serial-numbers.service';
 
 interface AuditDiscrepancyRaw {
   productId: string;
@@ -25,17 +26,32 @@ export class StockService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue('alerts') private alertsQueue: Queue,
+    private readonly serialNumbersService: SerialNumbersService,
   ) {}
 
   async createMovement(dto: CreateMovementDto, userId: string) {
     if (dto.batchId) {
       await this.validateBatch(dto.batchId, dto.productId);
     }
+    if (dto.serialNumbers && dto.serialNumbers.length !== dto.quantity) {
+      throw new BadRequestException(`El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`);
+    }
+
     const transactionId = uuidv4();
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        return this.executeMovementLogic(tx, dto, userId, transactionId);
+        const movementResult = await this.executeMovementLogic(tx, dto, userId, transactionId);
+
+        if (dto.serialNumbers && dto.serialNumbers.length > 0) {
+          if (dto.type === MovementType.INBOUND) {
+            await this.serialNumbersService.registerInbound(tx, dto.serialNumbers, movementResult.movement.id, dto.productId, dto.warehouseId, dto.batchId);
+          } else if (dto.type === MovementType.OUTBOUND) {
+            await this.serialNumbersService.registerOutbound(tx, dto.serialNumbers, movementResult.movement.id, dto.warehouseId, dto.productId);
+          }
+        }
+
+        return movementResult;
       });
 
       if (dto.type === MovementType.OUTBOUND) {
@@ -66,6 +82,9 @@ export class StockService {
 
     if (dto.batchId) {
       await this.validateBatch(dto.batchId, dto.productId);
+    }
+    if (dto.serialNumbers && dto.serialNumbers.length !== dto.quantity) {
+      throw new BadRequestException(`El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`);
     }
 
     const transactionId = uuidv4();
@@ -141,6 +160,16 @@ export class StockService {
           batchId: dto.batchId,
         }, userId, transactionId);
 
+        if (dto.serialNumbers && dto.serialNumbers.length > 0) {
+          await this.serialNumbersService.transferSerials(
+            tx,
+            dto.serialNumbers,
+            dto.fromWarehouseId,
+            dto.toWarehouseId,
+            dto.productId,
+          );
+        }
+
         return { transactionId, status: 'SUCCESS', minStockOrigin: originResult.minStock, stockAfterOrigin: originResult.stockAfter };
       });
 
@@ -165,6 +194,9 @@ export class StockService {
     if (dto.batchId) {
       await this.validateBatch(dto.batchId, dto.productId);
     }
+    if (dto.serialNumbers && dto.serialNumbers.length !== dto.quantity) {
+      throw new BadRequestException(`El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`);
+    }
     const transactionId = uuidv4();
 
     try {
@@ -183,16 +215,38 @@ export class StockService {
           currentQuantity = Number(stockLock[0].quantity);
         }
 
+        // 1.5. Lock pesimista de batch_stocks (Misma lógica que executeMovementLogic)
+        let currentBatchQuantity = 0;
+        if (dto.batchId) {
+          const batchLock = await tx.$queryRaw<{ quantity: number }[]>`
+            SELECT quantity 
+            FROM batch_stocks 
+            WHERE batch_id = ${dto.batchId}::uuid 
+              AND warehouse_id = ${dto.warehouseId}::uuid 
+            FOR UPDATE
+          `;
+          if (batchLock.length > 0) {
+            currentBatchQuantity = Number(batchLock[0].quantity);
+          }
+        }
+
         // 2. Validación en memoria
         if (dto.operation === 'SUBTRACT') {
           if (currentQuantity - dto.quantity < 0) {
             throw new BadRequestException('El ajuste resultaría en stock negativo');
+          }
+          if (dto.batchId && currentBatchQuantity - dto.quantity < 0) {
+            throw new BadRequestException('El ajuste resultaría en stock negativo para el lote');
           }
         }
 
         const newQuantity = dto.operation === 'ADD' 
           ? currentQuantity + dto.quantity 
           : currentQuantity - dto.quantity;
+          
+        const newBatchQuantity = dto.operation === 'ADD'
+          ? currentBatchQuantity + dto.quantity
+          : currentBatchQuantity - dto.quantity;
 
         // 3. Crear movimiento inmutable
         const notesWithPrefix = `[${dto.operation}] ${dto.notes}`;
@@ -208,6 +262,7 @@ export class StockService {
             transactionId,
             createdById: userId,
             correctsMovementId: dto.correctsMovementId,
+            batchId: dto.batchId,
           },
         });
 
@@ -241,6 +296,35 @@ export class StockService {
               quantity: { increment: dto.quantity },
             },
           });
+        }
+        
+        // 4.5 Materializar batch_stocks
+        if (dto.batchId) {
+          await tx.batchStock.upsert({
+            where: {
+              batchId_warehouseId: {
+                batchId: dto.batchId,
+                warehouseId: dto.warehouseId,
+              },
+            },
+            create: {
+              batchId: dto.batchId,
+              warehouseId: dto.warehouseId,
+              quantity: newBatchQuantity,
+            },
+            update: {
+              quantity: newBatchQuantity,
+            },
+          });
+        }
+
+        // 4.6 Materializar serials
+        if (dto.serialNumbers && dto.serialNumbers.length > 0) {
+          if (dto.operation === 'ADD') {
+            await this.serialNumbersService.registerInbound(tx, dto.serialNumbers, movement.id, dto.productId, dto.warehouseId, dto.batchId);
+          } else if (dto.operation === 'SUBTRACT') {
+            await this.serialNumbersService.registerOutbound(tx, dto.serialNumbers, movement.id, dto.warehouseId, dto.productId);
+          }
         }
 
         // 5. Fetch minStock para la cola

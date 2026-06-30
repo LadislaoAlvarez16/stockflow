@@ -90,6 +90,7 @@ model Product {
   stocks         Stock[]
   alerts         Alert[]
   batches        Batch[]
+  serialNumbers  SerialNumber[]
 
   @@map("products")
 }
@@ -108,6 +109,7 @@ model Warehouse {
   stocks         Stock[]
   alerts         Alert[]
   batchStocks    BatchStock[]
+  serialNumbers  SerialNumber[]
 
   @@map("warehouses")
 }
@@ -219,6 +221,7 @@ model Batch {
   product           Product   @relation(fields: [productId], references: [id])
   movements         StockMovement[]
   batchStocks       BatchStock[]
+  serialNumbers     SerialNumber[]
 
   @@unique([productId, batchNumber])
   @@index([productId])
@@ -240,4 +243,37 @@ model BatchStock {
   @@index([warehouseId])
   @@index([batchId])
   @@map("batch_stocks")
+}
+
+enum SerialNumberStatus {
+  available
+  reserved
+  consumed
+}
+
+model SerialNumber {
+  id                 String             @id @default(uuid()) @db.Uuid
+  serialNumber       String             @map("serial_number")
+  productId          String             @map("product_id") @db.Uuid
+  batchId            String?            @map("batch_id") @db.Uuid
+  warehouseId        String?            @map("warehouse_id") @db.Uuid
+  status             SerialNumberStatus @default(available)
+  inboundMovementId  String?            @map("inbound_movement_id") @db.Uuid
+  outboundMovementId String?            @map("outbound_movement_id") @db.Uuid
+  notes              String?
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  product            Product       @relation(fields: [productId], references: [id])
+  batch              Batch?        @relation(fields: [batchId], references: [id])
+  warehouse          Warehouse?    @relation(fields: [warehouseId], references: [id])
+  
+  // No hay relacion explicita definida bidireccional en StockMovement como pidió el usuario para evitar tocar el core demasiado,
+  // solo mantenemos los foreign keys de movimiento para la trazabilidad
+
+  @@unique([productId, serialNumber])
+  @@index([productId, status])
+  @@index([warehouseId, status])
+  @@index([batchId])
+  @@map("serial_numbers")
 }

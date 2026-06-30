@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsPositive, IsString, MaxLength, IsOptional } from 'class-validator';
+import { IsUUID, IsNumber, IsPositive, IsString, MaxLength, IsOptional, IsArray, ArrayMaxSize } from 'class-validator';
 
 export class CreateTransferDto {
   @IsUUID()
@@ -7,6 +7,12 @@ export class CreateTransferDto {
   @IsUUID()
   @IsOptional()
   batchId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  @ArrayMaxSize(1000)
+  serialNumbers?: string[];
 
   @IsUUID()
   fromWarehouseId: string;

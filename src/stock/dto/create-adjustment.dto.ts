@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsPositive, IsString, IsNotEmpty, IsIn, IsOptional } from 'class-validator';
+import { IsUUID, IsNumber, IsPositive, IsString, IsNotEmpty, IsIn, IsOptional, IsArray, ArrayMaxSize } from 'class-validator';
 
 export class CreateAdjustmentDto {
   @IsUUID()
@@ -7,6 +7,12 @@ export class CreateAdjustmentDto {
   @IsUUID()
   @IsOptional()
   batchId?: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  @ArrayMaxSize(1000)
+  serialNumbers?: string[];
 
   @IsUUID()
   warehouseId: string;
