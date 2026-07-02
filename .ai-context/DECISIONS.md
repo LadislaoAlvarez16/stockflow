@@ -213,3 +213,19 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 - Modificar `stocks` habría roto la retrocompatibilidad con la Fase 1.
 - Recalcular al vuelo destruye la performance en lecturas intensivas.
 - Aplicar el mismo patrón de `SELECT FOR UPDATE` sobre `batch_stocks` nos permite prevenir deadlocks y mantener concurrencia segura (Lock Hierarchy) sin introducir herramientas externas.
+
+---
+
+### 015 — Arquitectura UI de Trazabilidad y Validación Frontend Delegada (Fase 3)
+**Fecha:** 2026-07-02
+**Contexto:** Se desarrolló la interfaz para trazabilidad de lotes y series en el repositorio `stockflow-web`.
+**Decisiones:**
+1. **Validación de Reglas de Negocio en Backend:** 
+   - **Decisión:** El frontend no valida la exclusividad ni los formatos de los Números de Serie. Recopila los inputs (separados por coma o salto de línea en un `<textarea>`), los mapea a un array de strings y se los envía al servidor de stock.
+   - **Por qué:** El Backend es la fuente de verdad ("Backend is King"). Delegar el manejo de duplicados (Prisma `P2002`) y consistencia al backend simplifica enormemente la lógica del frontend. El cliente se limita a parsear los `ConflictException` (HTTP 409) y `BadRequestException` (HTTP 400) para mostrar notificaciones (toasts).
+2. **Carga de Datos (Data Fetching):**
+   - **Decisión:** Se mantuvieron los hooks tradicionales (`useEffect` y `useState`) y Axios.
+   - **Por qué:** Para no acoplar nuevas dependencias (ej. SWR o React Query) que aumenten el bundle size, respetando la directiva estricta de "mantener el cliente vainilla y sin librerías externas superfluas" de la Fase 1.
+3. **Sugerencia FEFO Asíncrona (Non-Blocking UI):**
+   - **Decisión:** Cuando un operador abre el cajón de Movimientos (Outbound), el frontend ejecuta `GET /stock/fefo-suggestion` de forma asíncrona y, al resolverse, inyecta visualmente un badge `(Recomendado FEFO)` sobre el lote candidato en el `<select>`.
+   - **Por qué:** La UI no se bloquea esperando cálculos del backend, permitiendo operaciones rápidas pero ofreciendo un guardrail inteligente contra el vencimiento.
