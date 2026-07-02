@@ -26,8 +26,9 @@ StockFlow es un backend y motor transaccional construido para resolver el proble
 
 ---
 
-## ✨ Características (Fase 1 Completada)
+## ✨ Características (Fase 3 Completada)
 
+- **Trazabilidad bidireccional por lote (FEFO) y número de serie con proyecciones materializadas concurrentes.**
 - **Auth & RBAC Dual:** Autenticación sin estado (Stateless JWT) con tres roles estrictos (`ADMIN`, `OPERATOR`, `VIEWER`). Los permisos se chequean criptográficamente sin asediar a la base de datos por cada request.
 - **Motor de Stock Inmutable:** Las operaciones de inventario se gestionan a través de transacciones ACID.
 - **ABM de Catálogos:** Gestión integral de Productos y Depósitos con "soft-deletes" para proteger la integridad referencial.

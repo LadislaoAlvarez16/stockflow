@@ -203,3 +203,13 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 3. **CORS Condicional por Entorno:**
    - **Decisión:** Se habilitó el CORS en `main.ts` utilizando como restricción de origen la variable `FRONTEND_URL`. Si esta no existe, se mantiene `origin: '*'`.
    - **Por qué:** Es un approach pragmático: blinda la seguridad en producción (Railway) forzando estrictamente el handshake de orígenes, pero mantiene retrocompatibilidad y fricción nula para desarrollo local.
+
+---
+
+### 014 — Proyección materializada separada para Lotes (`batch_stocks`)
+**Decisión:** Crear la tabla `batch_stocks` como proyección separada de `stocks`, actualizada dentro de la misma transacción del movimiento.
+**Descartado:** Agrupar los saldos recalculando `stock_movements` on-the-fly, o modificar la tabla `stocks` original para incluir el `batchId`.
+**Por qué:** 
+- Modificar `stocks` habría roto la retrocompatibilidad con la Fase 1.
+- Recalcular al vuelo destruye la performance en lecturas intensivas.
+- Aplicar el mismo patrón de `SELECT FOR UPDATE` sobre `batch_stocks` nos permite prevenir deadlocks y mantener concurrencia segura (Lock Hierarchy) sin introducir herramientas externas.
