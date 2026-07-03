@@ -12,7 +12,7 @@ export class BatchesController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.OPERATOR)
   create(@Body() createBatchDto: CreateBatchDto, @Request() req: any) {
-    return this.batchesService.create(createBatchDto, req.user.sub);
+    return this.batchesService.create(createBatchDto, req.user.id);
   }
 
   @Get()

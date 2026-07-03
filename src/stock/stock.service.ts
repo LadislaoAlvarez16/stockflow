@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, Logger, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MovementType, Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -69,7 +69,7 @@ export class StockService {
         stockAfter: result.stockAfter,
       };
     } catch (error) {
-      if (error instanceof BadRequestException) throw error;
+      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
       console.error('[StockService.createMovement] Transaction failed:', error);
       throw new InternalServerErrorException('Failed to process stock movement');
     }
@@ -184,7 +184,7 @@ export class StockService {
 
       return { transactionId: result.transactionId, status: result.status };
     } catch (error) {
-      if (error instanceof BadRequestException) throw error;
+      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
       console.error('[StockService.createTransfer] Transaction failed:', error);
       throw new InternalServerErrorException('Failed to process stock transfer');
     }
@@ -348,7 +348,7 @@ export class StockService {
 
       return { movement: result.movement, stockAfter: result.stockAfter };
     } catch (error) {
-      if (error instanceof BadRequestException) throw error;
+      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
       console.error('[StockService.createAdjustment] Transaction failed:', error);
       throw new InternalServerErrorException('Failed to process stock adjustment');
     }

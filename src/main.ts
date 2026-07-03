@@ -16,6 +16,8 @@ async function bootstrap() {
     origin: frontendUrl || '*',
   });
 
+  const { ValidationPipe } = require('@nestjs/common');
+  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new PrismaExceptionFilter());
 
   // Fail fast: Verify Bull Board credentials

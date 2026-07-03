@@ -10,24 +10,10 @@ import { UserRole } from '@prisma/client';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class DebugController {
-  constructor(private readonly alertsCronService: AlertsCronService) {}
+  constructor() {}
 
   @Post(':name')
   async runCron(@Param('name') name: string) {
-    switch (name) {
-      case 'check-stock-alerts':
-        await this.alertsCronService.checkStockAlerts();
-        break;
-      case 'resolve-stale-alerts':
-        await this.alertsCronService.resolveStaleAlerts();
-        break;
-      case 'daily-report':
-        await this.alertsCronService.handleDailyReport();
-        break;
-      default:
-        throw new BadRequestException(`Cron job '${name}' no reconocido.`);
-    }
-
-    return { success: true, executed: name };
+    return { success: false, message: 'Cron functionality disabled in Phase 3' };
   }
 }
