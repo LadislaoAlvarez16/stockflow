@@ -20,6 +20,9 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { DebugModule } from './common/debug/debug.module';
 import { BatchesModule } from './batches/batches.module';
+import { PhysicalInventoryModule } from './physical-inventory/physical-inventory.module';
+import { ReportsModule } from './reports/reports.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -32,6 +35,7 @@ import { BatchesModule } from './batches/batches.module';
     WarehousesModule,
     StockModule,
     BatchesModule,
+    PhysicalInventoryModule,
     ImportsModule,
     AlertsModule,
     DashboardModule,
@@ -39,6 +43,8 @@ import { BatchesModule } from './batches/batches.module';
     CategoriesModule,
     NotificationsModule,
     DebugModule,
+    ReportsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [

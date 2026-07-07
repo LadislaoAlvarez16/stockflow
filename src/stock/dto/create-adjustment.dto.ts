@@ -31,4 +31,8 @@ export class CreateAdjustmentDto {
   @IsOptional()
   @IsUUID()
   correctsMovementId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  physicalInventorySessionId?: string;
 }

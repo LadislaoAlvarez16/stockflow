@@ -7,12 +7,14 @@ import { AlertsCronService } from './alerts.cron';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from '../common/common.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
+import { WebhooksModule } from '../webhooks/webhooks.module';
 
 @Module({
   imports: [
     CommonModule,
     NotificationsModule,
     DashboardModule,
+    WebhooksModule,
     BullModule.registerQueue({
       name: 'alerts',
       defaultJobOptions: {

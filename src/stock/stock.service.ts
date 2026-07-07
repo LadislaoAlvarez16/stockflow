@@ -11,6 +11,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { CheckLowStockJob } from '../queue/interfaces/check-low-stock.job';
 import { SerialNumbersService } from '../serial-numbers/serial-numbers.service';
+import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
+import { WebhookEventType } from '@prisma/client';
 
 interface AuditDiscrepancyRaw {
   productId: string;
@@ -27,6 +29,7 @@ export class StockService {
     private readonly prisma: PrismaService,
     @InjectQueue('alerts') private alertsQueue: Queue,
     private readonly serialNumbersService: SerialNumbersService,
+    private readonly webhookDispatcherService: WebhookDispatcherService,
   ) {}
 
   async createMovement(dto: CreateMovementDto, userId: string) {
@@ -63,6 +66,15 @@ export class StockService {
         });
         this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`);
       }
+
+      await this.webhookDispatcherService.dispatch(WebhookEventType.movement_created, {
+        movementId: result.movement.id,
+        type: result.movement.type,
+        quantity: result.movement.quantity,
+        productId: result.movement.productId,
+        warehouseId: result.movement.warehouseId,
+        batchId: result.movement.batchId,
+      });
 
       return {
         movement: result.movement,
@@ -182,6 +194,20 @@ export class StockService {
       });
       this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.fromWarehouseId}`);
 
+      // Emitir eventos de movimiento creado para ambos almacenes (OUTBOUND e INBOUND)
+      // Como esto es asíncrono y los movimientos ya se crearon, debemos hacer 
+      // queries a Prisma para obtener el ID real, o simplemente no mandar IDs pero 
+      // mandamos la metadata de transferencia
+      await this.webhookDispatcherService.dispatch(WebhookEventType.movement_created, {
+        transactionId: result.transactionId,
+        type: 'TRANSFER',
+        quantity: dto.quantity,
+        productId: dto.productId,
+        fromWarehouseId: dto.fromWarehouseId,
+        toWarehouseId: dto.toWarehouseId,
+        batchId: dto.batchId,
+      });
+
       return { transactionId: result.transactionId, status: result.status };
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
@@ -263,6 +289,7 @@ export class StockService {
             createdById: userId,
             correctsMovementId: dto.correctsMovementId,
             batchId: dto.batchId,
+            physicalInventorySessionId: dto.physicalInventorySessionId,
           },
         });
 
@@ -345,6 +372,15 @@ export class StockService {
         });
         this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`);
       }
+
+      await this.webhookDispatcherService.dispatch(WebhookEventType.movement_created, {
+        movementId: result.movement.id,
+        type: result.movement.type,
+        quantity: result.movement.quantity,
+        productId: result.movement.productId,
+        warehouseId: result.movement.warehouseId,
+        batchId: result.movement.batchId,
+      });
 
       return { movement: result.movement, stockAfter: result.stockAfter };
     } catch (error) {

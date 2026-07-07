@@ -62,6 +62,8 @@ model User {
   stockMovements StockMovement[]
   importJobs     ImportJob[]
   resolvedAlerts Alert[]
+  physicalInventorySessions PhysicalInventorySession[]
+  webhookSubscriptions WebhookSubscription[]
 
   @@map("users")
 }
@@ -82,7 +84,8 @@ model Product {
   category  String
   costPrice Decimal  @map("cost_price") @db.Decimal(10, 2)
   minStock  Decimal  @default(0) @map("min_stock") @db.Decimal(10, 2)
-  isActive  Boolean  @default(true) @map("is_active")
+  isActive         Boolean  @default(true) @map("is_active")
+  hasSerialNumbers Boolean  @default(false) @map("has_serial_numbers")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -110,6 +113,7 @@ model Warehouse {
   alerts         Alert[]
   batchStocks    BatchStock[]
   serialNumbers  SerialNumber[]
+  physicalInventorySessions PhysicalInventorySession[]
 
   @@map("warehouses")
 }
@@ -126,6 +130,7 @@ model StockMovement {
   createdById        String       @map("created_by_id") @db.Uuid
   correctsMovementId String?      @map("corrects_movement_id") @db.Uuid
   batchId            String?      @map("batch_id") @db.Uuid
+  physicalInventorySessionId String? @map("physical_inventory_session_id") @db.Uuid
   createdAt          DateTime     @default(now()) @map("created_at")
 
   product          Product         @relation(fields: [productId], references: [id])
@@ -134,12 +139,14 @@ model StockMovement {
   correctsMovement StockMovement?  @relation("MovementCorrection", fields: [correctsMovementId], references: [id])
   correctedBy      StockMovement[] @relation("MovementCorrection")
   batch            Batch?          @relation(fields: [batchId], references: [id])
+  physicalInventorySession PhysicalInventorySession? @relation(fields: [physicalInventorySessionId], references: [id])
 
   @@index([productId])
   @@index([warehouseId])
   @@index([type])
   @@index([transactionId])
   @@index([createdById])
+  @@index([physicalInventorySessionId])
   @@index([createdAt(sort: Desc)])
   @@index([productId, warehouseId, createdAt(sort: Desc)])
   @@map("stock_movements")
@@ -276,4 +283,77 @@ model SerialNumber {
   @@index([warehouseId, status])
   @@index([batchId])
   @@map("serial_numbers")
+}
+
+enum PhysicalInventoryStatus {
+  processing
+  completed
+  completed_with_differences
+  completed_with_errors
+  failed
+}
+
+model PhysicalInventorySession {
+  id            String                  @id @default(uuid()) @db.Uuid
+  warehouseId   String                  @map("warehouse_id") @db.Uuid
+  status        PhysicalInventoryStatus @default(processing)
+  matchedItems  Int                     @default(0) @map("matched_items")
+  adjustedItems Int                     @default(0) @map("adjusted_items")
+  skippedItems  Int                     @default(0) @map("skipped_items")
+  errorLog      Json?                   @map("error_log")
+  createdById   String                  @map("created_by_id") @db.Uuid
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+
+  warehouse Warehouse       @relation(fields: [warehouseId], references: [id])
+  createdBy User            @relation(fields: [createdById], references: [id])
+  movements StockMovement[]
+
+  @@index([warehouseId])
+  @@index([status])
+  @@index([createdById])
+  @@map("physical_inventory_sessions")
+}
+
+enum WebhookEventType {
+  stock_low       @map("stock.low")
+  stock_out       @map("stock.out")
+  movement_created @map("movement.created")
+  batch_expiring   @map("batch.expiring")
+  inventory_reconciled @map("inventory.reconciled")
+}
+
+model WebhookSubscription {
+  id              String             @id @default(uuid()) @db.Uuid
+  url             String
+  encryptedSecret String             @map("encrypted_secret")
+  events          WebhookEventType[]
+  isActive        Boolean            @default(true) @map("is_active")
+  createdById     String             @map("created_by_id") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  createdBy       User               @relation(fields: [createdById], references: [id])
+  deliveries      WebhookDelivery[]
+
+  @@index([isActive])
+  @@index([createdById])
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id             String              @id @default(uuid()) @db.Uuid
+  subscriptionId String              @map("subscription_id") @db.Uuid
+  event          WebhookEventType
+  statusCode     Int?                @map("status_code")
+  responseBody   String?             @map("response_body") @db.VarChar(500)
+  duration       Int
+  attemptNumber  Int                 @map("attempt_number")
+  deliveredAt    DateTime            @default(now()) @map("delivered_at")
+
+  subscription   WebhookSubscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+  @@index([event])
+  @@map("webhook_deliveries")
 }

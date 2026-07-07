@@ -32,7 +32,8 @@ StockFlow es un backend y motor transaccional construido para resolver el proble
 - **Auth & RBAC Dual:** Autenticación sin estado (Stateless JWT) con tres roles estrictos (`ADMIN`, `OPERATOR`, `VIEWER`). Los permisos se chequean criptográficamente sin asediar a la base de datos por cada request.
 - **Motor de Stock Inmutable:** Las operaciones de inventario se gestionan a través de transacciones ACID.
 - **ABM de Catálogos:** Gestión integral de Productos y Depósitos con "soft-deletes" para proteger la integridad referencial.
-- **Motor ETL Masivo:** Endpoint optimizado para ingesta masiva (Excel/CSV) con procesamiento ultra-rápido en memoria, map/reduce para validaciones O(1), y doble idempotencia.
+- **Motor ETL Masivo e Inventario Físico:** Endpoint optimizado para ingesta masiva (Excel/CSV) con procesamiento ultra-rápido en memoria para carga inicial y reconciliación de inventarios físicos.
+- **Motor de Reportes PDF:** Generación nativa de comprobantes y listados (Puppeteer + HTML/CSS inyectado dinámicamente) sin degradar la memoria del servidor.
 - **Dashboard Operativo:** Endpoints de métricas preparadas para dashboards analíticos.
 
 ---
@@ -118,5 +119,4 @@ StockFlow sigue una arquitectura modular en **NestJS**. Cada dominio de negocio 
 ---
 
 ## 🗺️ Roadmap (Próximas Fases)
-- **Fase 2:** Automatización Asíncrona total (Workers BullMQ, notificaciones vía Email con resiliencia, Reportes programados).
-- **Fase 3:** Sistema FIFO estricto, Lotes y Fechas de Vencimiento para la industria de alimentos/farma.
+- **Fase 4:** Frontend Final. Implementación completa de componentes (shadcn/ui), ruteo (React Router), estado y UX completa de todas las entidades y reportes (React, Vite).

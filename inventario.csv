@@ -1,0 +1,7 @@
+sku,counted_quantity,batch_number,notes
+LIM-TRA-1U,5,,coincide exacto
+LIM-ESP-1U,10,,sobran 10
+LIM-DES-1L,3,,faltan 2
+SKU-FANTASMA-999,99,,no existe
+SKU-MAL-CANTIDAD, -5,,cantidad negativa
+LIM-DET-500ML,1,,serializado

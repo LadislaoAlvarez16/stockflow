@@ -48,5 +48,50 @@
 3. **Prevención de Route Collision:**
    - Al exponer los endpoints en `BatchesController`, la ruta estática `@Get('expiring-soon')` fue intencionalmente declarada por encima de las rutas paramétricas como `@Get(':id/movements')`. NestJS evalúa en orden descendente; omitir este detalle técnico desencadenaría un "Shadowing" e interpretaría "expiring-soon" como un UUID.
 
-4. **Blindaje mediante Paginación Estricta:**
    - Todo endpoint de trazabilidad cruzada (`/batches/:id/movements`, `/batches/:id/serial-numbers`) está obligado estructuralmente a usar `take` y `skip`. Es un escudo de protección en producción para evitar Vectores de DoS derivados de una saturación masiva de la DB al listar el historial infinito de un lote físico.
+
+## 015 - Descarga de Reportes Protegidos y Manejo de Errores Binarios (Fase 3)
+**Fecha:** 2026-07-06
+**Contexto:** Los endpoints de descarga de PDFs (generados por Puppeteer) están protegidos por JWT. Utilizar un hipervínculo tradicional (`<a href="...">`) resultaría en un error `401 Unauthorized` al no poder inyectar el header de Autorización.
+
+**Decisiones:**
+1. **Descarga vía Axios y URL Efímera:**
+   - La petición se realiza explícitamente a través del cliente HTTP inyectando el header `Authorization: Bearer <token>` y configurando la directiva `responseType: 'blob'`. 
+   - El Blob recibido se convierte a una URL temporal en memoria del cliente (`window.URL.createObjectURL(blob)`) y se simula un click programático, forzando la descarga local.
+
+2. **Liberación Estricta de Memoria:**
+   - Se introdujo un `setTimeout` de 100ms antes de ejecutar `window.URL.revokeObjectURL(url)`. Esto otorga al navegador el margen necesario para asentar la descarga en background previniendo errores de puntero huérfano.
+
+3. **Fallback JSON en Respuestas Fallidas:**
+   - Forzar Axios a esperar un `blob` causa que respuestas de error como un JSON `400 BadRequest` (ej. si el filtro de fechas supera los 90 días) lleguen al cliente parseadas erróneamente como binarios. 
+   - Se interceptan las respuestas fallidas que contengan un tipo `Blob` en el `error.response.data`. Mediante `await blob.text()` y `JSON.parse()`, se reconstituye el mensaje de la excepción nativa de NestJS y se re-inyecta en el objeto de error, garantizando que los Toast notifiquen con contexto preciso en lugar de un error de lectura de stream.
+
+## 016 - Delegación Transversal de PDF y Separación de Responsabilidades (Fase 3)
+**Fecha:** 2026-07-06
+**Contexto:** Necesidad de exponer un comprobante PDF (Reporte 4) al finalizar una sesión de Inventario Físico. ¿El endpoint y lógica deben ir en `ReportsModule` o en `PhysicalInventoryModule`?
+
+**Decisiones:**
+1. **Semántica de Endpoints RESTful:**
+   - Se ubicó el endpoint en `GET /physical-inventory/:id/report` dentro del `PhysicalInventoryController`. Esto preserva la semántica estricta y predecible de que un reporte atado a una entidad específica pertenezca a la ruta de esa entidad.
+
+2. **Inyección de Módulos (Cross-Module Dependency):**
+   - Toda la lógica del armado en HTML y renderizado de PDF reside estrictamente en el `ReportsService` (exportado globalmente por el `ReportsModule`). Esto centraliza el motor de reportes con Puppeteer, permitiendo que el módulo de Inventario Físico funcione como un mero orquestador/cliente, reduciendo duplicación de código y aislando dependencias.
+
+## 017 - Criptografía Bidireccional (AES-256-GCM) para Secrets de Webhooks
+**Fecha:** 2026-07-07
+**Contexto:** Necesitamos almacenar secrets para firmar los payloads de los webhooks suscritos, con el objetivo de que el receptor verifique la autenticidad de la petición (HMAC).
+
+**Decisiones:**
+1. **No usar hashes unidireccionales (Bcrypt/Argon2):** A diferencia de las contraseñas, donde el sistema solo necesita verificar, el sistema (el worker futuro) necesita el secret en plano en memoria para firmar el payload antes de enviarlo. Un hash unidireccional haría imposible recuperar el secret.
+2. **Uso de AES-256-GCM:** Se eligió un algoritmo de cifrado autenticado (AEAD) provisto nativamente por `crypto` de Node.js. Garantiza confidencialidad e integridad.
+3. **Formato concatenado (`iv:encrypted:authTag`):** Se consolida toda la metadata en una sola cadena para almacenarla en el campo `encrypted_secret`. Mantiene el esquema agnóstico a las peculiaridades del algoritmo criptográfico.
+4. **Fail Fast en el Bootstrap:** El módulo aserta la existencia y longitud de `WEBHOOK_ENCRYPTION_KEY` (exactamente 32 bytes) al instanciarse. Si no es válida, la app crashea de inmediato para prevenir estado corrupto o endpoints inoperantes.
+
+## 018 - Despacho Asíncrono de Webhooks y Paginación por Cursor
+**Fecha:** 2026-07-07
+**Contexto:** Los eventos de dominio (como `movement.created` o `stock.low`) deben disparar webhooks a los clientes. Las entregas HTTP pueden fallar, bloquearse (timeout) o reintentarse. A su vez, se requiere un historial auditable infinito de las entregas (`webhook_deliveries`).
+
+**Decisiones:**
+1. **Despacho estrictamente Post-Transaccional (BR-21):** El `WebhookDispatcherService.dispatch` nunca se invoca dentro de un `prisma.$transaction()`. Si el webhook falla, el motor transaccional del ERP ya consolidó los datos de manera consistente.
+2. **Workers en BullMQ con Backoff:** El retry y control de latencias (Axios) se delega completamente a un worker asíncrono. Los errores HTTP fuerzan un `throw` luego del log para que BullMQ gestione el backoff exponencial.
+3. **Paginación obligatoria por Cursor (Keyset Pagination):** Dado que la tabla `webhook_deliveries` es un historial inmutable de alto crecimiento, se prohíbe `skip/take` tradicional por offset. El endpoint `GET /webhooks/:id/deliveries` requiere obligatoriamente paginación por cursor (`id`) para prevenir OOM y degradación en el DB Engine.

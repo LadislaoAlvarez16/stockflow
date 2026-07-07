@@ -3,8 +3,9 @@ import { Job, Queue } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { CheckLowStockJob } from '../../queue/interfaces/check-low-stock.job';
 import { AlertsService } from '../alerts.service';
-import { AlertType } from '@prisma/client';
+import { AlertType, WebhookEventType } from '@prisma/client';
 import { InjectQueue } from '@nestjs/bullmq';
+import { WebhookDispatcherService } from '../../webhooks/webhook-dispatcher.service';
 
 @Processor('alerts')
 @Injectable()
@@ -14,6 +15,7 @@ export class AlertsWorker extends WorkerHost {
   constructor(
     private readonly alertsService: AlertsService,
     @InjectQueue('notifications') private readonly notificationsQueue: Queue,
+    private readonly webhookDispatcherService: WebhookDispatcherService,
   ) {
     super();
   }
@@ -62,5 +64,20 @@ export class AlertsWorker extends WorkerHost {
       message,
     });
     this.logger.log(`Notificación encolada para la alerta ${alert.id}`);
+
+    // Emitir webhook
+    const webhookEvent = type === AlertType.OUT_OF_STOCK 
+      ? WebhookEventType.stock_out 
+      : WebhookEventType.stock_low;
+      
+    await this.webhookDispatcherService.dispatch(webhookEvent, {
+      alertId: alert.id,
+      productId,
+      warehouseId,
+      currentQuantity,
+      minStock,
+      message,
+      type,
+    });
   }
 }
