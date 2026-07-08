@@ -242,6 +242,8 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 2. **Revelado Único del Secret de Webhook (BR-22):**
    - **Decisión:** El *Secret* se revela en texto plano mediante un Modal en la UI **únicamente una vez** post-creación, con un botón que usa `navigator.clipboard.writeText()` (envuelto en `try/catch` para entornos sin HTTPS estricto). Nunca se envía devuelta al servidor y el servidor nunca lo expone en posteriores GET.
    - **Por qué:** Maximizamos la seguridad y limitamos el radio de explosión. Al encriptarse con AES-256-GCM en base de datos, ni el administrador del sistema puede recuperar un token perdido.
-3. **Filtros Compuestos en Prisma `count()`:**
+3. **Filtros Compuestos en Prisma `count()` (Workaround Temporal):**
    - **Decisión:** Ante la limitación de Prisma de no soportar `where.field_field: { in: [...] }` en la operación `count()`, se modificó la lógica en el backend (`StockService.getStocks`) para inyectar dinámicamente un array de bloques en `where.OR`.
-   - **Por qué:** Soluciona el bug `Invalid prisma.stock.count()` permitiendo paginar listados de stock que cruzan umbrales sin perder la performance del motor subyacente.
+   - **Por qué:** Soluciona el bug `Invalid prisma.stock.count()` a corto plazo para cerrar el ticket.
+   - **Luz Amarilla (Trade-off):** Inyectar bloques `OR` masivos genera un AST pesado que puede colapsar el planificador de queries de PostgreSQL. Como se documentó en la **Decisión 012**, esto es un riesgo. Si el filtro de stock bajo devuelve cientos o miles de tuplas, esto degradará la latencia.
+   - **Solución Definitiva (Futuro):** Si se detecta degradación, se reescribirá este `count()` específico usando `$queryRaw` para que PostgreSQL haga el conteo nativo aprovechando los índices, salteándose la capa de agregación de Prisma.
