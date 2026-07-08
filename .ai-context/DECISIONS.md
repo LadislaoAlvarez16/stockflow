@@ -247,3 +247,17 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
    - **Por qué:** Soluciona el bug `Invalid prisma.stock.count()` a corto plazo para cerrar el ticket.
    - **Luz Amarilla (Trade-off):** Inyectar bloques `OR` masivos genera un AST pesado que puede colapsar el planificador de queries de PostgreSQL. Como se documentó en la **Decisión 012**, esto es un riesgo. Si el filtro de stock bajo devuelve cientos o miles de tuplas, esto degradará la latencia.
    - **Solución Definitiva (Futuro):** Si se detecta degradación, se reescribirá este `count()` específico usando `$queryRaw` para que PostgreSQL haga el conteo nativo aprovechando los índices, salteándose la capa de agregación de Prisma.
+
+---
+
+### 017 — Webhooks configurables vs fijos
+**Decisión:** Webhooks con suscripción a eventos configurables por el usuario.
+**Descartado:** Webhooks fijos hardcodeados.
+**Por qué:** Aporta valor real de integración B2B. Permite al usuario definir qué le interesa (ej. solo stock.low). Sigue el modelo estándar de la industria (Stripe, GitHub).
+
+---
+
+### 018 — Firma de payloads con HMAC-SHA256
+**Decisión:** Todo payload de webhook se firma usando HMAC-SHA256 con el secret de la suscripción, enviando el hash en el header `X-StockFlow-Signature`.
+**Descartado:** Envío de payloads sin firma o validación por IP.
+**Por qué:** Permite al receptor verificar matemáticamente que el evento fue originado por StockFlow y que el cuerpo del mensaje no fue manipulado en tránsito (Man-in-the-Middle).
