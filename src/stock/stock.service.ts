@@ -499,12 +499,10 @@ export class StockService {
         };
       }
 
-      (where as any).productId_warehouseId = {
-        in: lowStockPairs.map(p => ({
-          productId: p.product_id,
-          warehouseId: p.warehouse_id
-        }))
-      };
+      where.OR = lowStockPairs.map(p => ({
+        productId: p.product_id,
+        warehouseId: p.warehouse_id
+      }));
     }
 
     const include = {

@@ -41,7 +41,7 @@ export class WebhooksWorker extends WorkerHost {
       const response = await axios.post(url, bodyString, {
         headers: {
           'Content-Type': 'application/json',
-          'X-StockFlow-Signature': `sha256=\${signature}`,
+          'X-StockFlow-Signature': `sha256=${signature}`,
           'X-StockFlow-Event': event,
           'X-StockFlow-Delivery': job.id,
           'X-StockFlow-Timestamp': new Date().toISOString(),
@@ -85,7 +85,7 @@ export class WebhooksWorker extends WorkerHost {
       });
 
       // Importante: re-lanzar error para que BullMQ registre el backoff
-      this.logger.error(`Webhook fallido para suscripcion \${subscriptionId}, evento \${event}. Attempt: \${attemptNumber}. Error: \${error.message}`);
+      this.logger.error(`Webhook fallido para suscripcion ${subscriptionId}, evento ${event}. Attempt: ${attemptNumber}. Error: ${error.message}`);
       throw error;
     }
   }

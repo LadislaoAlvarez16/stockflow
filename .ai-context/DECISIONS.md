@@ -229,3 +229,19 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 3. **Sugerencia FEFO Asíncrona (Non-Blocking UI):**
    - **Decisión:** Cuando un operador abre el cajón de Movimientos (Outbound), el frontend ejecuta `GET /stock/fefo-suggestion` de forma asíncrona y, al resolverse, inyecta visualmente un badge `(Recomendado FEFO)` sobre el lote candidato en el `<select>`.
    - **Por qué:** La UI no se bloquea esperando cálculos del backend, permitiendo operaciones rápidas pero ofreciendo un guardrail inteligente contra el vencimiento.
+
+---
+
+### 016 — Webhooks Frontend y Bugfix de Concurrencia de Prisma (Fase 2 - Continuación)
+**Fecha:** 2026-07-08
+**Contexto:** Despliegue de la interfaz de administración para Webhooks y resolución de error interno de Prisma en el conteo de registros filtrados por múltiples columnas.
+**Decisiones:**
+1. **Paginación por Cursor en UI sin librerías adicionales:** 
+   - **Decisión:** El frontend de entregas de Webhooks implementa el botón "Cargar Más" usando un hook vanilla (`useWebhooks`) con un *functional state update* (`prev => [...prev, ...nuevos]`).
+   - **Por qué:** Evita la complejidad de *stale closures* en React y mantiene el peso del bundle al mínimo (sin Zustand/ReactQuery), siguiendo la decisión original (012 y 015).
+2. **Revelado Único del Secret de Webhook (BR-22):**
+   - **Decisión:** El *Secret* se revela en texto plano mediante un Modal en la UI **únicamente una vez** post-creación, con un botón que usa `navigator.clipboard.writeText()` (envuelto en `try/catch` para entornos sin HTTPS estricto). Nunca se envía devuelta al servidor y el servidor nunca lo expone en posteriores GET.
+   - **Por qué:** Maximizamos la seguridad y limitamos el radio de explosión. Al encriptarse con AES-256-GCM en base de datos, ni el administrador del sistema puede recuperar un token perdido.
+3. **Filtros Compuestos en Prisma `count()`:**
+   - **Decisión:** Ante la limitación de Prisma de no soportar `where.field_field: { in: [...] }` en la operación `count()`, se modificó la lógica en el backend (`StockService.getStocks`) para inyectar dinámicamente un array de bloques en `where.OR`.
+   - **Por qué:** Soluciona el bug `Invalid prisma.stock.count()` permitiendo paginar listados de stock que cruzan umbrales sin perder la performance del motor subyacente.
