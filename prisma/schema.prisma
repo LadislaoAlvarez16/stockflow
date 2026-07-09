@@ -94,6 +94,7 @@ model Product {
   alerts         Alert[]
   batches        Batch[]
   serialNumbers  SerialNumber[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@map("products")
 }
@@ -114,6 +115,7 @@ model Warehouse {
   batchStocks    BatchStock[]
   serialNumbers  SerialNumber[]
   physicalInventorySessions PhysicalInventorySession[]
+  purchaseOrders PurchaseOrder[]
 
   @@map("warehouses")
 }
@@ -168,16 +170,48 @@ model Stock {
   @@map("stocks")
 }
 
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  RECEIVED
+  CANCELLED
+}
+
 model PurchaseOrder {
+  id          String              @id @default(uuid()) @db.Uuid
+  supplierId  String              @map("supplier_id") @db.Uuid
+  warehouseId String              @map("warehouse_id") @db.Uuid
+  status      PurchaseOrderStatus @default(DRAFT)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  supplier  Supplier            @relation(fields: [supplierId], references: [id])
+  warehouse Warehouse           @relation(fields: [warehouseId], references: [id])
+  items     PurchaseOrderItem[]
+
+  @@index([supplierId])
+  @@index([warehouseId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
   id               String   @id @default(uuid()) @db.Uuid
-  supplierName     String?  @map("supplier_name")
-  status           String   @default("draft")
-  quantityOrdered  Decimal? @map("quantity_ordered") @db.Decimal(10, 2)
-  quantityReceived Decimal? @map("quantity_received") @db.Decimal(10, 2)
+  purchaseOrderId  String   @map("purchase_order_id") @db.Uuid
+  productId        String   @map("product_id") @db.Uuid
+  quantityOrdered  Int      @map("quantity_ordered")
+  quantityReceived Int      @default(0) @map("quantity_received")
+  costPrice        Decimal  @map("cost_price") @db.Decimal(10, 2)
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  @@map("purchase_orders")
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@map("purchase_order_items")
 }
 
 model ImportJob {
@@ -356,4 +390,19 @@ model WebhookDelivery {
   @@index([subscriptionId])
   @@index([event])
   @@map("webhook_deliveries")
+}
+
+model Supplier {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  taxId     String   @unique @map("tax_id")
+  email     String?
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
 }
