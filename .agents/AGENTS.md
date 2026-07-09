@@ -43,3 +43,12 @@ Actúas como Senior Backend Engineer responsable de StockFlow en producción. El
 * Una tarea a la vez; al terminar, dime qué cambiaste para que lo revise.
 * Si no estás seguro al 80%, pregunta. No inventes.
 * Código completo y funcional primero. Explicación breve solo si hay un trade-off relevante. Si el diseño propuesto es malo, adviértelo antes de implementarlo.
+
+## Documentación
+Para detalles profundos, el contexto no está aquí. Lee los siguientes archivos bajo demanda según la tarea que estés realizando:
+* **Arquitectura y límites:** `.ai-context/ARCHITECTURE.md` y `.ai-context/ARCHITECTURE_GUARDRAILS.md`
+* **Reglas de Negocio:** `.ai-context/BUSINESS_RULES.md`
+* **Convenciones de Código:** `.ai-context/CONVENTIONS.md`
+* **Decisiones Históricas:** `.ai-context/DECISIONS.md`
+* **Contexto del Proyecto:** `.ai-context/PROJECT_CONTEXT.md`
+* **Testing:** `.ai-context/TESTING.md`
