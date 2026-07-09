@@ -261,3 +261,14 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 **Decisión:** Todo payload de webhook se firma usando HMAC-SHA256 con el secret de la suscripción, enviando el hash en el header `X-StockFlow-Signature`.
 **Descartado:** Envío de payloads sin firma o validación por IP.
 **Por qué:** Permite al receptor verificar matemáticamente que el evento fue originado por StockFlow y que el cuerpo del mensaje no fue manipulado en tránsito (Man-in-the-Middle).
+
+---
+
+### 019 — Separación transaccional entre Estado de OC y Motor de Stock (Semana 7)
+**Contexto:** La recepción de Órdenes de Compra debe actualizar la OC y automáticamente generar movimientos de INBOUND en el motor de stock.
+**Decisión:** La actualización de los saldos de la Orden de Compra y la inyección de movimientos (INBOUND) se realizan en transacciones a base de datos completamente separadas e independientes de forma secuencial.
+**Descartado:** Macro-transacción de Prisma que envuelva la actualización de la OC y el método `StockService.createMovement()`.
+**Por qué:**
+- **Prevención de Deadlocks:** `StockService` utiliza `SELECT FOR UPDATE` para bloquear filas específicas de stock y garantizar concurrencia segura. Envolver este proceso en una transacción más grande (la de la OC) incrementa exponencialmente el tiempo que la tabla `stocks` permanece bloqueada, degradando la performance y provocando deadlocks bajo carga.
+- **Aislamiento Core (Guardrails):** La arquitectura dicta que los módulos satélite no pueden inmiscuirse en las transacciones del módulo core de inventario.
+- **Tolerancia a fallos:** Si bien se pierde la atomicidad absoluta entre la OC y el movimiento de stock, una divergencia aquí (ej. OC recibida pero INBOUND fallido por error de red/servidor) deja la OC como evidencia auditable, mientras que un bloqueo de base de datos interrumpe todo el sistema de manera global.
