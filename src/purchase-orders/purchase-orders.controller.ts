@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, ParseUUIDPipe, Query, UseGuards, Request } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { GetPurchaseOrdersFilterDto } from './dto/get-purchase-orders-filter.dto';
+import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
@@ -35,5 +36,14 @@ export class PurchaseOrdersController {
   @Patch(':id/cancel')
   cancel(@Param('id', ParseUUIDPipe) id: string) {
     return this.purchaseOrdersService.transitionToCancelled(id);
+  }
+
+  @Patch(':id/receive')
+  receive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() receivePurchaseOrderDto: ReceivePurchaseOrderDto,
+    @Request() req: any,
+  ) {
+    return this.purchaseOrdersService.receive(id, receivePurchaseOrderDto, req.user.id);
   }
 }

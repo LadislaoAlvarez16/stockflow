@@ -2,11 +2,18 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../common/prisma.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { GetPurchaseOrdersFilterDto } from './dto/get-purchase-orders-filter.dto';
-import { Prisma, PurchaseOrderStatus } from '@prisma/client';
+import { Prisma, PurchaseOrderStatus, WebhookEventType, MovementType } from '@prisma/client';
+import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
+import { StockService } from '../stock/stock.service';
+import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 
 @Injectable()
 export class PurchaseOrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly stockService: StockService,
+    private readonly webhookDispatcher: WebhookDispatcherService,
+  ) {}
 
   async create(createPurchaseOrderDto: CreatePurchaseOrderDto) {
     const { supplierId, warehouseId, items } = createPurchaseOrderDto;
@@ -143,5 +150,77 @@ export class PurchaseOrdersService {
       where: { id },
       data: { status: PurchaseOrderStatus.CANCELLED },
     });
+  }
+
+  async receive(id: string, dto: ReceivePurchaseOrderDto, userId: string) {
+    // Validación Inicial
+    const order = await this.findOne(id);
+
+    if (order.status !== PurchaseOrderStatus.SENT && order.status !== PurchaseOrderStatus.PARTIAL) {
+      throw new BadRequestException(`Cannot receive items for an order in ${order.status} status.`);
+    }
+
+    // Validación de Ítems
+    for (const itemDto of dto.items) {
+      const orderItem = order.items.find(i => i.productId === itemDto.productId);
+      if (!orderItem) {
+        throw new BadRequestException(`Product ${itemDto.productId} is not part of this purchase order.`);
+      }
+
+      const maxAllowed = orderItem.quantityOrdered - orderItem.quantityReceived;
+      if (itemDto.quantityReceived > maxAllowed) {
+        throw new BadRequestException(`Cannot receive ${itemDto.quantityReceived} of product ${itemDto.productId}. Maximum allowed is ${maxAllowed}.`);
+      }
+    }
+
+    // Transacción de OC (Fase 1)
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // Actualizar quantityReceived de cada item
+      for (const itemDto of dto.items) {
+        await tx.purchaseOrderItem.updateMany({
+          where: { purchaseOrderId: id, productId: itemDto.productId },
+          data: { quantityReceived: { increment: itemDto.quantityReceived } },
+        });
+      }
+
+      // Recalcular estado
+      const updatedItems = await tx.purchaseOrderItem.findMany({
+        where: { purchaseOrderId: id },
+      });
+
+      const allReceived = updatedItems.every(i => i.quantityReceived === i.quantityOrdered);
+      const newStatus = allReceived ? PurchaseOrderStatus.RECEIVED : PurchaseOrderStatus.PARTIAL;
+
+      // Actualizar orden
+      return tx.purchaseOrder.update({
+        where: { id },
+        data: { status: newStatus },
+      });
+    });
+
+    // Impacto en Stock (Fase 2 - Post-Transacción)
+    for (const itemDto of dto.items) {
+      const orderItem = order.items.find(i => i.productId === itemDto.productId);
+      
+      await this.stockService.createMovement({
+        productId: itemDto.productId,
+        warehouseId: dto.warehouseId,
+        type: MovementType.INBOUND,
+        quantity: itemDto.quantityReceived,
+        reference: dto.reference,
+        // No pasamos costPrice porque createMovement no lo soporta directamente en el core DTO actual
+      }, userId);
+    }
+
+    // Webhook
+    if (updatedOrder.status === PurchaseOrderStatus.RECEIVED) {
+      await this.webhookDispatcher.dispatch(WebhookEventType.purchase_order_received, {
+        purchaseOrderId: updatedOrder.id,
+        supplierId: updatedOrder.supplierId,
+        warehouseId: updatedOrder.warehouseId,
+      });
+    }
+
+    return updatedOrder;
   }
 }

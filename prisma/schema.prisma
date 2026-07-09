@@ -355,6 +355,7 @@ enum WebhookEventType {
   movement_created @map("movement.created")
   batch_expiring   @map("batch.expiring")
   inventory_reconciled @map("inventory.reconciled")
+  purchase_order_received @map("purchase_order.received")
 }
 
 model WebhookSubscription {
