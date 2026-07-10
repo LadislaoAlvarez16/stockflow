@@ -4,9 +4,10 @@ import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PrismaService } from '../common/prisma.service';
 import { StockModule } from '../stock/stock.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [StockModule, WebhooksModule],
+  imports: [StockModule, WebhooksModule, AuditModule],
   controllers: [PurchaseOrdersController],
   providers: [PurchaseOrdersService, PrismaService],
   exports: [PurchaseOrdersService],

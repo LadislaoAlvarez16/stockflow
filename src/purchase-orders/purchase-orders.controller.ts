@@ -34,8 +34,12 @@ export class PurchaseOrdersController {
   }
 
   @Patch(':id/cancel')
-  cancel(@Param('id', ParseUUIDPipe) id: string) {
-    return this.purchaseOrdersService.transitionToCancelled(id);
+  cancel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: any,
+  ) {
+    const userId = req.user?.sub || req.user?.id || 'system';
+    return this.purchaseOrdersService.transitionToCancelled(id, userId);
   }
 
   @Patch(':id/receive')

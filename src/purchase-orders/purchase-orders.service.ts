@@ -6,6 +6,7 @@ import { Prisma, PurchaseOrderStatus, WebhookEventType, MovementType } from '@pr
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { StockService } from '../stock/stock.service';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -13,6 +14,7 @@ export class PurchaseOrdersService {
     private readonly prisma: PrismaService,
     private readonly stockService: StockService,
     private readonly webhookDispatcher: WebhookDispatcherService,
+    private readonly auditService: AuditService,
   ) {}
 
   async create(createPurchaseOrderDto: CreatePurchaseOrderDto) {
@@ -131,7 +133,7 @@ export class PurchaseOrdersService {
     });
   }
 
-  async transitionToCancelled(id: string) {
+  async transitionToCancelled(id: string, userId: string = 'system') {
     const order = await this.findOne(id);
 
     if (order.status === PurchaseOrderStatus.PARTIAL || order.status === PurchaseOrderStatus.RECEIVED) {
@@ -146,10 +148,20 @@ export class PurchaseOrdersService {
       throw new BadRequestException(`Invalid status transition from ${order.status} to CANCELLED.`);
     }
 
-    return this.prisma.purchaseOrder.update({
+    const updatedOrder = await this.prisma.purchaseOrder.update({
       where: { id },
       data: { status: PurchaseOrderStatus.CANCELLED },
     });
+
+    this.auditService.log({
+      userId,
+      action: 'CANCEL_PURCHASE_ORDER',
+      entity: 'PurchaseOrder',
+      entityId: id,
+      metadata: { fromStatus: order.status, toStatus: PurchaseOrderStatus.CANCELLED },
+    });
+
+    return updatedOrder;
   }
 
   async receive(id: string, dto: ReceivePurchaseOrderDto, userId: string) {

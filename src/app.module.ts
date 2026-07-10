@@ -25,6 +25,9 @@ import { ReportsModule } from './reports/reports.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
+import { AuditModule } from './audit/audit.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
 @Module({
   imports: [
@@ -49,6 +52,7 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
     WebhooksModule,
     SuppliersModule,
     PurchaseOrdersModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [
@@ -60,6 +64,10 @@ import { PurchaseOrdersModule } from './purchase-orders/purchase-orders.module';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
     },
   ],
 })
