@@ -178,4 +178,115 @@ export class ImportsService {
 
     return result;
   }
+
+  async processProducts(file: Express.Multer.File): Promise<ImportResultDto> {
+    const csvData = file.buffer.toString('utf8');
+    const parsed = Papa.parse<any>(csvData, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() });
+    
+    if (parsed.errors.length > 0) throw new BadRequestException('Error parsing CSV');
+    
+    const rows = parsed.data;
+    if (rows.length > MAX_IMPORT_ROWS) throw new BadRequestException(`El archivo excede el límite de ${MAX_IMPORT_ROWS} filas.`);
+
+    const result: ImportResultDto = { totalProcessed: rows.length, successCount: 0, errorCount: 0, errors: [] };
+
+    // Procesar en chunks de 100
+    const chunkSize = 100;
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const chunk = rows.slice(i, i + chunkSize);
+      
+      await this.prisma.$transaction(async (tx) => {
+        for (let j = 0; j < chunk.length; j++) {
+          const row = chunk[j];
+          const rowNum = i + j + 2;
+          
+          if (!row.sku || !row.name || !row.costPrice) {
+            result.errorCount++;
+            result.errors.push({ row: rowNum, reason: 'Faltan campos obligatorios (sku, name, costPrice)' });
+            continue;
+          }
+
+          try {
+            await tx.product.upsert({
+              where: { sku: row.sku.trim() },
+              update: {
+                name: row.name.trim(),
+                costPrice: parseFloat(row.costPrice) || 0,
+                minStock: row.minStock ? parseFloat(row.minStock) : 0,
+                category: row.category?.trim() || 'Uncategorized',
+              },
+              create: {
+                sku: row.sku.trim(),
+                name: row.name.trim(),
+                costPrice: parseFloat(row.costPrice) || 0,
+                minStock: row.minStock ? parseFloat(row.minStock) : 0,
+                category: row.category?.trim() || 'Uncategorized',
+              },
+            });
+            result.successCount++;
+          } catch (e: any) {
+            result.errorCount++;
+            result.errors.push({ row: rowNum, reason: `Error de BD: ${e.message}` });
+          }
+        }
+      });
+    }
+    return result;
+  }
+
+  async processInitialStock(file: Express.Multer.File, warehouseId: string, userId: string): Promise<ImportResultDto> {
+    const csvData = file.buffer.toString('utf8');
+    const parsed = Papa.parse<any>(csvData, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() });
+    
+    if (parsed.errors.length > 0) throw new BadRequestException('Error parsing CSV');
+    const rows = parsed.data;
+    if (rows.length > MAX_IMPORT_ROWS) throw new BadRequestException(`El archivo excede el límite de ${MAX_IMPORT_ROWS} filas.`);
+
+    const result: ImportResultDto = { totalProcessed: rows.length, successCount: 0, errorCount: 0, errors: [] };
+
+    // Obtener todos los SKUs para validación O(1)
+    const skus = Array.from(new Set(rows.map(r => r.sku?.trim()).filter(Boolean)));
+    const products = await this.prisma.product.findMany({ where: { sku: { in: skus } }, select: { id: true, sku: true } });
+    const productMap = new Map<string, string>();
+    products.forEach(p => productMap.set(p.sku, p.id));
+
+    // Validar warehouse
+    const wh = await this.prisma.warehouse.findUnique({ where: { id: warehouseId } });
+    if (!wh) throw new BadRequestException('Warehouse no existe');
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2;
+      const sku = row.sku?.trim();
+      const quantity = parseFloat(row.quantity);
+
+      if (!sku || isNaN(quantity) || quantity <= 0) {
+        result.errorCount++;
+        result.errors.push({ row: rowNum, reason: 'SKU faltante o cantidad inválida' });
+        continue;
+      }
+
+      const productId = productMap.get(sku);
+      if (!productId) {
+        result.errorCount++;
+        result.errors.push({ row: rowNum, reason: `SKU ${sku} no existe` });
+        continue;
+      }
+
+      try {
+        await this.stockService.createMovement({
+          productId,
+          warehouseId,
+          type: MovementType.INBOUND,
+          quantity,
+          reference: row.reference || 'INITIAL_STOCK_IMPORT'
+        }, userId);
+        result.successCount++;
+      } catch (e: any) {
+        result.errorCount++;
+        result.errors.push({ row: rowNum, reason: `Error al crear movimiento: ${e.message}` });
+      }
+    }
+    return result;
+  }
 }
