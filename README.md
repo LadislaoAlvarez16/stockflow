@@ -33,7 +33,7 @@ StockFlow es un backend y motor transaccional construido para resolver el proble
 - **Auth & RBAC Dual:** Autenticación sin estado (Stateless JWT) con tres roles estrictos (`ADMIN`, `OPERATOR`, `VIEWER`). Los permisos se chequean criptográficamente sin asediar a la base de datos por cada request.
 - **Motor de Stock Inmutable:** Las operaciones de inventario se gestionan a través de transacciones ACID.
 - **ABM de Catálogos:** Gestión integral de Productos y Depósitos con "soft-deletes" para proteger la integridad referencial.
-- **Motor ETL Masivo e Inventario Físico:** Endpoint optimizado para ingesta masiva (Excel/CSV) con procesamiento ultra-rápido en memoria para carga inicial y reconciliación de inventarios físicos.
+- **Motor ETL Masivo e Inventario Físico:** Pipeline de ingesta por chunks para archivos CSV (Productos, Stock Inicial, Movimientos). Soporte `upsert` idempotente y tolerancia a fallos parciales (acumula errores fila por fila sin abortar el bloque) garantizando UX fluida para operadores.
 - **Motor de Reportes PDF:** Generación nativa de comprobantes y listados (Puppeteer + HTML/CSS inyectado dinámicamente) sin degradar la memoria del servidor.
 - **Dashboard Operativo:** Endpoints de métricas preparadas para dashboards analíticos.
 

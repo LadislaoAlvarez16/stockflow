@@ -272,3 +272,17 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 - **Prevención de Deadlocks:** `StockService` utiliza `SELECT FOR UPDATE` para bloquear filas específicas de stock y garantizar concurrencia segura. Envolver este proceso en una transacción más grande (la de la OC) incrementa exponencialmente el tiempo que la tabla `stocks` permanece bloqueada, degradando la performance y provocando deadlocks bajo carga.
 - **Aislamiento Core (Guardrails):** La arquitectura dicta que los módulos satélite no pueden inmiscuirse en las transacciones del módulo core de inventario.
 - **Tolerancia a fallos:** Si bien se pierde la atomicidad absoluta entre la OC y el movimiento de stock, una divergencia aquí (ej. OC recibida pero INBOUND fallido por error de red/servidor) deja la OC como evidencia auditable, mientras que un bloqueo de base de datos interrumpe todo el sistema de manera global.
+
+---
+
+### 020 — Estrategia de ETL para Importación Masiva (Fase 1)
+**Contexto:** Se agregó la capacidad de importar Productos y Stock Inicial desde archivos CSV.
+**Decisión:** 
+1. **Idempotencia y Chunks:** Los productos se procesan usando `upsert` (inserta si no existe, actualiza si existe) y se agrupan en transacciones pequeñas (bloques de 100 filas).
+2. **Reutilización del Core:** El Stock Inicial no inserta directamente en la base de datos, sino que llama al `StockService.createMovement(..., INBOUND)`.
+3. **Resiliencia (Fail-soft):** Si una fila falla (ej. SKU no existe), se acumula el error y se continúa con la siguiente, retornando un consolidado final.
+**Descartado:** Inserción masiva pura (`createMany`), fallar rápido (abortar todo el archivo ante el primer error), inserción manual de saldo inicial salteando el servicio de movimientos.
+**Por qué:**
+- **Procesamiento en Chunks:** Previene *Out-of-Memory* en Node.js y evita que el planificador de PostgreSQL colapse tratando de resolver un AST masivo de miles de operaciones concurrentes.
+- **Fail-soft:** UX fundamental. Para un operador cargando 5000 productos, es inaceptable que la carga falle en la fila 4999 y aborte todo. Es preferible que cargue 4999, reporte 1 error, y el operador corrija sólo ese en la UI.
+- **Reutilización del Core:** Al usar `StockService`, el Stock Inicial hereda automáticamente la inmutabilidad (`stock_movements`), los `SELECT FOR UPDATE` y la proyección concurrente, evitando tener dos lógicas distintas que escriban inventario.
