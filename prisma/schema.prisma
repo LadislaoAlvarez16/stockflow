@@ -149,6 +149,7 @@ model StockMovement {
   @@index([transactionId])
   @@index([createdById])
   @@index([physicalInventorySessionId])
+  @@index([batchId])
   @@index([createdAt(sort: Desc)])
   @@index([productId, warehouseId, createdAt(sort: Desc)])
   @@map("stock_movements")

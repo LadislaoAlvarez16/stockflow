@@ -67,7 +67,8 @@ export class PurchaseOrdersService {
   }
 
   async findAll(filters: GetPurchaseOrdersFilterDto) {
-    const { status, supplierId, warehouseId, dateFrom, dateTo } = filters;
+    const { status, supplierId, warehouseId, dateFrom, dateTo, page = 1, limit = 20 } = filters;
+
     const where: Prisma.PurchaseOrderWhereInput = {};
 
     if (status) {
@@ -89,14 +90,31 @@ export class PurchaseOrdersService {
       }
     }
 
-    return this.prisma.purchaseOrder.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        supplier: { select: { id: true, name: true } },
-        warehouse: { select: { id: true, name: true } },
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.purchaseOrder.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          supplier: { select: { id: true, name: true } },
+          warehouse: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.purchaseOrder.count({ where })
+    ]);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-    });
+    };
   }
 
   async findOne(id: string) {

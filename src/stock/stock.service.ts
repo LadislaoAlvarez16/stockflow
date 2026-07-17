@@ -80,9 +80,12 @@ export class StockService {
         movement: result.movement,
         stockAfter: result.stockAfter,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
-      console.error('[StockService.createMovement] Transaction failed:', error);
+      
+      const errorCode = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : 'UNKNOWN';
+      this.logger.error(`[StockService.createMovement] Transaction failed. Code: ${errorCode}`, error.stack);
+      
       throw new InternalServerErrorException('Failed to process stock movement');
     }
   }
@@ -209,9 +212,12 @@ export class StockService {
       });
 
       return { transactionId: result.transactionId, status: result.status };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
-      console.error('[StockService.createTransfer] Transaction failed:', error);
+      
+      const errorCode = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : 'UNKNOWN';
+      this.logger.error(`[StockService.createTransfer] Transaction failed. Code: ${errorCode}`, error.stack);
+      
       throw new InternalServerErrorException('Failed to process stock transfer');
     }
   }
@@ -383,9 +389,12 @@ export class StockService {
       });
 
       return { movement: result.movement, stockAfter: result.stockAfter };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
-      console.error('[StockService.createAdjustment] Transaction failed:', error);
+      
+      const errorCode = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : 'UNKNOWN';
+      this.logger.error(`[StockService.createAdjustment] Transaction failed. Code: ${errorCode}`, error.stack);
+      
       throw new InternalServerErrorException('Failed to process stock adjustment');
     }
   }
