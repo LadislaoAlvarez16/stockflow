@@ -1,10 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { WarehousesService } from './warehouses.service';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('Warehouses')
+@ApiBearerAuth()
 @Controller('warehouses')
 export class WarehousesController {
   constructor(private readonly warehousesService: WarehousesService) {}
@@ -40,4 +51,3 @@ export class WarehousesController {
     return this.warehousesService.deactivate(id);
   }
 }
-

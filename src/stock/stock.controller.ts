@@ -1,30 +1,34 @@
-import { Controller, Post, Body, Get, Param, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { StockService } from './stock.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { GetStockFiltersDto } from './dto/get-stock-filters.dto';
 import { GetMovementsFiltersDto } from './dto/get-movements-filters.dto';
-// Wait, the imports use '../common/guards/jwt-auth.guard' and '../common/guards/roles.guard'. 
-// I need to check if jwt-auth.guard exists, but the user requested this explicitly.
-// Actually, in NestJS, if Auth/JWT is implemented globally, maybe we don't need UseGuards.
-// The ARCHITECTURE.md said: "Autenticación global por JWT. Rutas públicas deben usar explícitamente `@Public()`."
-// So `@UseGuards(JwtAuthGuard, RolesGuard)` might be redundant or might throw an error if not found.
-// The user provided the code, I will use it. If there is an error, I will fix it.
+// Wait, the imports use '../common/guards/jwt-auth.guard' and '../common/guards/roles.guard'.
 import { Roles } from '../common/decorators/roles.decorator';
-
-// Assuming the user doesn't have JwtAuthGuard and RolesGuard in common/guards (I checked earlier, common/guards/roles.guard.ts exists but no jwt-auth.guard).
-// I will just use the user's provided code verbatim.
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { BatchesService } from '../batches/batches.service';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiTags('Stock')
+@ApiBearerAuth()
 @Controller('stock')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StockController {
   constructor(
     private readonly stockService: StockService,
-    private readonly batchesService: BatchesService
+    private readonly batchesService: BatchesService,
   ) {}
 
   @Post('movement')
@@ -41,7 +45,10 @@ export class StockController {
 
   @Post('adjustment')
   @Roles('ADMIN')
-  async createAdjustment(@Body() dto: CreateAdjustmentDto, @Request() req: any) {
+  async createAdjustment(
+    @Body() dto: CreateAdjustmentDto,
+    @Request() req: any,
+  ) {
     return this.stockService.createAdjustment(dto, req.user.id);
   }
 
@@ -70,10 +77,16 @@ export class StockController {
     @Query('quantity') quantity: string,
   ) {
     const qty = Number(quantity);
-    const suggestedBatch = await this.batchesService.suggestBatchForOutbound(productId, warehouseId, qty);
+    const suggestedBatch = await this.batchesService.suggestBatchForOutbound(
+      productId,
+      warehouseId,
+      qty,
+    );
     return {
       suggestedBatch,
-      reason: suggestedBatch ? 'FEFO policy applied' : 'No suitable batch found'
+      reason: suggestedBatch
+        ? 'FEFO policy applied'
+        : 'No suitable batch found',
     };
   }
 
@@ -86,7 +99,12 @@ export class StockController {
     @Query('includeEmpty') includeEmpty?: string,
   ) {
     const parseIncludeEmpty = includeEmpty === 'true';
-    return this.stockService.getStockByBatch(productId, warehouseId, batchId, parseIncludeEmpty);
+    return this.stockService.getStockByBatch(
+      productId,
+      warehouseId,
+      batchId,
+      parseIncludeEmpty,
+    );
   }
 
   @Get()

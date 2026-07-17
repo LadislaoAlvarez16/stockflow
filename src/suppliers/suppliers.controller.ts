@@ -1,12 +1,12 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  ParseUUIDPipe, 
-  UseGuards 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
@@ -38,8 +38,8 @@ export class SuppliersController {
 
   @Patch(':id')
   update(
-    @Param('id', ParseUUIDPipe) id: string, 
-    @Body() updateSupplierDto: UpdateSupplierDto
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateSupplierDto: UpdateSupplierDto,
   ) {
     return this.suppliersService.update(id, updateSupplierDto);
   }

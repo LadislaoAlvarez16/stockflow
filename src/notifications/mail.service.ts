@@ -18,10 +18,15 @@ export class MailService {
       },
     });
 
-    this.mailFrom = this.configService.get<string>('MAIL_FROM') || 'no-reply@stockflow.com';
+    this.mailFrom =
+      this.configService.get<string>('MAIL_FROM') || 'no-reply@stockflow.com';
   }
 
-  async sendMail(payload: { to: string[]; subject: string; html: string }): Promise<void> {
+  async sendMail(payload: {
+    to: string[];
+    subject: string;
+    html: string;
+  }): Promise<void> {
     // We intentionally let errors bubble up so BullMQ can catch them and retry
     await this.transporter.sendMail({
       from: this.mailFrom,

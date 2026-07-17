@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, ParseUUIDPipe, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { GetPurchaseOrdersFilterDto } from './dto/get-purchase-orders-filter.dto';
@@ -34,10 +45,7 @@ export class PurchaseOrdersController {
   }
 
   @Patch(':id/cancel')
-  cancel(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: any,
-  ) {
+  cancel(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
     const userId = req.user?.sub || req.user?.id || 'system';
     return this.purchaseOrdersService.transitionToCancelled(id, userId);
   }
@@ -48,6 +56,10 @@ export class PurchaseOrdersController {
     @Body() receivePurchaseOrderDto: ReceivePurchaseOrderDto,
     @Request() req: any,
   ) {
-    return this.purchaseOrdersService.receive(id, receivePurchaseOrderDto, req.user.id);
+    return this.purchaseOrdersService.receive(
+      id,
+      receivePurchaseOrderDto,
+      req.user.id,
+    );
   }
 }

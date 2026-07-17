@@ -20,9 +20,16 @@ export class AlertsCronService {
   @Cron('0 */6 * * *')
   async checkStockAlerts() {
     this.logger.log('Ejecutando cron checkStockAlerts (Fallback)...');
-    
+
     // Buscar stocks que cayeron por debajo del mínimo (min_stock > 0 para ignorar los no configurados)
-    const vulnerableStocks = await this.prisma.$queryRaw<Array<{ product_id: string, warehouse_id: string, quantity: number, min_stock: number }>>`
+    const vulnerableStocks = await this.prisma.$queryRaw<
+      Array<{
+        product_id: string;
+        warehouse_id: string;
+        quantity: number;
+        min_stock: number;
+      }>
+    >`
       SELECT s.product_id, s.warehouse_id, s.quantity, p.min_stock 
       FROM stocks s 
       JOIN products p ON s.product_id = p.id 
@@ -40,11 +47,13 @@ export class AlertsCronService {
           currentQuantity: stock.quantity,
           minStock: stock.min_stock,
         },
-        { jobId }
+        { jobId },
       );
     }
-    
-    this.logger.log(`checkStockAlerts finalizado. Se encontraron ${vulnerableStocks.length} casos potenciales.`);
+
+    this.logger.log(
+      `checkStockAlerts finalizado. Se encontraron ${vulnerableStocks.length} casos potenciales.`,
+    );
   }
 
   @Cron('0 3 * * *')
@@ -60,14 +69,18 @@ export class AlertsCronService {
     `;
 
     if (staleAlerts.length > 0) {
-      const ids = staleAlerts.map(a => a.id);
+      const ids = staleAlerts.map((a) => a.id);
       await this.prisma.alert.updateMany({
         where: { id: { in: ids } },
         data: { status: AlertStatus.RESOLVED, resolvedAt: new Date() },
       });
-      this.logger.log(`resolveStaleAlerts finalizado. Se resolvieron automáticamente ${ids.length} alertas obsoletas.`);
+      this.logger.log(
+        `resolveStaleAlerts finalizado. Se resolvieron automáticamente ${ids.length} alertas obsoletas.`,
+      );
     } else {
-      this.logger.debug('resolveStaleAlerts: No se encontraron alertas obsoletas.');
+      this.logger.debug(
+        'resolveStaleAlerts: No se encontraron alertas obsoletas.',
+      );
     }
   }
 
@@ -78,7 +91,9 @@ export class AlertsCronService {
     const summary = await this.dashboardService.getSummary();
 
     if (summary.lowStockCount === 0 && summary.todayMovements === 0) {
-      this.logger.debug('No hay alertas activas ni movimientos recientes. Reporte omitido.');
+      this.logger.debug(
+        'No hay alertas activas ni movimientos recientes. Reporte omitido.',
+      );
       return;
     }
 
@@ -90,7 +105,9 @@ export class AlertsCronService {
     const to = admins.map((admin) => admin.email);
 
     if (to.length === 0) {
-      this.logger.warn('No se encontraron administradores activos para enviar el reporte diario.');
+      this.logger.warn(
+        'No se encontraron administradores activos para enviar el reporte diario.',
+      );
       return;
     }
 
@@ -101,6 +118,8 @@ export class AlertsCronService {
       ...summary,
     });
 
-    this.logger.log(`Reporte diario encolado exitosamente para ${to.length} administrador(es).`);
+    this.logger.log(
+      `Reporte diario encolado exitosamente para ${to.length} administrador(es).`,
+    );
   }
 }

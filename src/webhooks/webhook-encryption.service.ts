@@ -10,7 +10,9 @@ export class WebhookEncryptionService {
     const keyString = process.env.WEBHOOK_ENCRYPTION_KEY;
     if (!keyString || keyString.length !== 64) {
       // 64 chars in hex = 32 bytes
-      throw new Error('WEBHOOK_ENCRYPTION_KEY must be exactly 32 bytes (64 hex characters). Use "openssl rand -hex 32" to generate it.');
+      throw new Error(
+        'WEBHOOK_ENCRYPTION_KEY must be exactly 32 bytes (64 hex characters). Use "openssl rand -hex 32" to generate it.',
+      );
     }
     this.key = Buffer.from(keyString, 'hex');
   }
@@ -19,12 +21,12 @@ export class WebhookEncryptionService {
     try {
       const iv = crypto.randomBytes(12); // 96-bit IV is recommended for GCM
       const cipher = crypto.createCipheriv(this.algorithm, this.key, iv);
-      
+
       let encrypted = cipher.update(plaintext, 'utf8', 'hex');
       encrypted += cipher.final('hex');
-      
+
       const authTag = cipher.getAuthTag().toString('hex');
-      
+
       // format: iv:encrypted:authTag
       return `\${iv.toString('hex')}:\${encrypted}:\${authTag}`;
     } catch (error) {

@@ -20,7 +20,10 @@ export class ReportsService {
   ) {}
 
   async generateStockValuation(warehouseId?: string): Promise<Buffer> {
-    const whereClause: any = { quantity: { gt: 0 }, product: { isActive: true } };
+    const whereClause: any = {
+      quantity: { gt: 0 },
+      product: { isActive: true },
+    };
     if (warehouseId) whereClause.warehouseId = warehouseId;
 
     const stocks = await this.prisma.stock.findMany({
@@ -32,8 +35,10 @@ export class ReportsService {
 
     for (const stock of stocks) {
       const p = stock.product;
-      const categoryKey = p.category ? p.category.trim().toUpperCase() : 'SIN CATEGORÍA';
-      
+      const categoryKey = p.category
+        ? p.category.trim().toUpperCase()
+        : 'SIN CATEGORÍA';
+
       const existing = productMap.get(p.id);
       const qty = Number(stock.quantity);
       const cost = Number(p.costPrice);
@@ -43,8 +48,12 @@ export class ReportsService {
         existing.totalValue += qty * cost;
       } else {
         productMap.set(p.id, {
-          sku: p.sku, name: p.name, category: categoryKey,
-          quantity: qty, costPrice: cost, totalValue: qty * cost,
+          sku: p.sku,
+          name: p.name,
+          category: categoryKey,
+          quantity: qty,
+          costPrice: cost,
+          totalValue: qty * cost,
         });
       }
     }
@@ -53,12 +62,15 @@ export class ReportsService {
     let grandTotal = 0;
 
     for (const item of productMap.values()) {
-      if (!categoriesMap.has(item.category)) categoriesMap.set(item.category, []);
+      if (!categoriesMap.has(item.category))
+        categoriesMap.set(item.category, []);
       categoriesMap.get(item.category)!.push(item);
       grandTotal += item.totalValue;
     }
 
-    const sortedCategories = Array.from(categoriesMap.keys()).sort((a, b) => a.localeCompare(b));
+    const sortedCategories = Array.from(categoriesMap.keys()).sort((a, b) =>
+      a.localeCompare(b),
+    );
 
     let htmlContent = `
       <table>
@@ -98,20 +110,32 @@ export class ReportsService {
     `;
 
     let subtitle = 'Consolidado Global';
-    if (warehouseId && stocks.length > 0) subtitle = `Depósito: \${stocks[0].warehouse.name}`;
+    if (warehouseId && stocks.length > 0)
+      subtitle = `Depósito: \${stocks[0].warehouse.name}`;
 
     const fullHtml = PdfService.baseReportLayout(htmlContent, {
       title: 'Reporte de Valorización de Stock',
       subtitle: subtitle,
-      date: new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleDateString('es-AR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     });
 
     return this.pdfService.generateFromHtml(fullHtml);
   }
 
-  async generateMovementHistory(dateFrom: string, dateTo: string): Promise<Buffer> {
+  async generateMovementHistory(
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<Buffer> {
     if (!dateFrom || !dateTo) {
-      throw new BadRequestException('Las fechas dateFrom y dateTo son obligatorias');
+      throw new BadRequestException(
+        'Las fechas dateFrom y dateTo son obligatorias',
+      );
     }
 
     const from = new Date(dateFrom);
@@ -125,9 +149,11 @@ export class ReportsService {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays > 90) {
-      throw new BadRequestException('El rango de fechas no puede superar los 90 días por protección de memoria');
+      throw new BadRequestException(
+        'El rango de fechas no puede superar los 90 días por protección de memoria',
+      );
     }
-    
+
     // Set 'to' to end of day if it matches 'from' or is just a date string
     to.setHours(23, 59, 59, 999);
 
@@ -150,12 +176,12 @@ export class ReportsService {
 
     let cursorId: string | undefined = undefined;
     let keepFetching = true;
-    
+
     const totals: Record<string, number> = {
       INBOUND: 0,
       OUTBOUND: 0,
       TRANSFER: 0,
-      ADJUSTMENT: 0
+      ADJUSTMENT: 0,
     };
 
     while (keepFetching) {
@@ -163,10 +189,7 @@ export class ReportsService {
         take: 500,
         skip: cursorId ? 1 : 0,
         cursor: cursorId ? { id: cursorId } : undefined,
-        orderBy: [
-          { createdAt: 'desc' },
-          { id: 'asc' }
-        ],
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         where: {
           createdAt: {
             gte: from,
@@ -177,8 +200,8 @@ export class ReportsService {
           product: { select: { sku: true, name: true } },
           warehouse: { select: { name: true } },
           createdBy: { select: { name: true } },
-          batch: { select: { batchNumber: true } }
-        }
+          batch: { select: { batchNumber: true } },
+        },
       });
 
       if (movements.length === 0) {
@@ -194,13 +217,19 @@ export class ReportsService {
         if (movType === 'OUTBOUND') color = '#ef4444'; // red
         if (movType === 'TRANSFER') color = '#f59e0b'; // orange
         if (movType === 'ADJUSTMENT') color = '#3b82f6'; // blue
-        
+
         if (totals[movType] !== undefined) {
           totals[movType] += Number(mov.quantity);
         }
 
-        const dateStr = mov.createdAt.toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-        
+        const dateStr = mov.createdAt.toLocaleDateString('es-AR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
         htmlContent += `
           <tr>
             <td style="font-size: 10px;">\${dateStr}</td>
@@ -248,13 +277,22 @@ export class ReportsService {
     const fullHtml = PdfService.baseReportLayout(htmlContent, {
       title: 'Historial de Movimientos de Stock',
       subtitle: `Período: \${from.toLocaleDateString('es-AR')} al \${to.toLocaleDateString('es-AR')}`,
-      date: new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleDateString('es-AR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     });
 
     return this.pdfService.generateFromHtml(fullHtml);
   }
 
-  async generateExpiryReport(warehouseId?: string, expiresInDays?: number): Promise<Buffer> {
+  async generateExpiryReport(
+    warehouseId?: string,
+    expiresInDays?: number,
+  ): Promise<Buffer> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -265,7 +303,7 @@ export class ReportsService {
     }
 
     const whereBatchStock: Prisma.BatchStockWhereInput = {
-      quantity: { gt: 0 }
+      quantity: { gt: 0 },
     };
     if (warehouseId) {
       whereBatchStock.warehouseId = warehouseId;
@@ -273,7 +311,7 @@ export class ReportsService {
 
     const batchWhere: Prisma.BatchWhereInput = {
       expiryDate: { not: null },
-      batchStocks: { some: whereBatchStock }
+      batchStocks: { some: whereBatchStock },
     };
 
     if (maxDate) {
@@ -287,10 +325,10 @@ export class ReportsService {
         product: true,
         batchStocks: {
           where: whereBatchStock,
-          include: { warehouse: true }
-        }
+          include: { warehouse: true },
+        },
       },
-      orderBy: { expiryDate: 'asc' }
+      orderBy: { expiryDate: 'asc' },
     });
 
     let htmlContent = `
@@ -311,11 +349,11 @@ export class ReportsService {
     for (const b of batches) {
       const vto = new Date(b.expiryDate!);
       // Fix timezone offsets issues by zeroing hours
-      vto.setHours(0,0,0,0);
-      
+      vto.setHours(0, 0, 0, 0);
+
       const diffTime = vto.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+
       let colorClass = '#10b981'; // Green
       if (diffDays < 15) {
         colorClass = '#ef4444'; // Red
@@ -349,7 +387,13 @@ export class ReportsService {
     const fullHtml = PdfService.baseReportLayout(htmlContent, {
       title: 'Reporte de Lotes por Vencer',
       subtitle: subtitle,
-      date: new Date().toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleDateString('es-AR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
     });
 
     return this.pdfService.generateFromHtml(fullHtml);
@@ -365,16 +409,22 @@ export class ReportsService {
           include: {
             product: true,
             batch: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!session) {
       throw new BadRequestException('Sesión de inventario no encontrada');
     }
 
-    const dateStr = session.createdAt.toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const dateStr = session.createdAt.toLocaleDateString('es-AR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
     let htmlContent = `
       <div style="margin-bottom: 20px;">
@@ -406,11 +456,11 @@ export class ReportsService {
           </thead>
           <tbody>
       `;
-      
+
       for (const mov of session.movements) {
         // En los ajustes, quantity puede ser negativo o positivo dependiendo de si fue SUBTRACT o ADD.
         // Prisma Decimal type a Number. Si es SUBTRACT y quantity es positivo en base, le ponemos el signo.
-        // En StockService se guarda con signo nativo en BD? Depende. Lo parseamos del string notes si es necesario, 
+        // En StockService se guarda con signo nativo en BD? Depende. Lo parseamos del string notes si es necesario,
         // pero la regla dice: "Renderizá esa columna tal cual viene de la base de datos".
         const isNegative = Number(mov.quantity) < 0;
         const color = isNegative ? '#ef4444' : '#10b981';
@@ -426,14 +476,18 @@ export class ReportsService {
           </tr>
         `;
       }
-      
+
       htmlContent += `
           </tbody>
         </table>
       `;
     }
 
-    if (session.errorLog && Array.isArray(session.errorLog) && session.errorLog.length > 0) {
+    if (
+      session.errorLog &&
+      Array.isArray(session.errorLog) &&
+      session.errorLog.length > 0
+    ) {
       htmlContent += `
         <h3 style="color: #ef4444; font-size: 16px; margin-top: 30px; margin-bottom: 10px; border-bottom: 2px solid #fca5a5; padding-bottom: 5px;">Errores Detectados</h3>
         <table style="border: 1px solid #fca5a5;">
@@ -476,4 +530,3 @@ export class ReportsService {
     return this.pdfService.generateFromHtml(fullHtml);
   }
 }
-

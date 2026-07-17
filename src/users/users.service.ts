@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -100,7 +104,10 @@ export class UsersService {
     };
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'>> {
+  async update(
+    id: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'>> {
     await this.findById(id);
 
     const updatedUser = await this.prisma.user.update({
@@ -108,15 +115,23 @@ export class UsersService {
       data: {
         ...(updateUserDto.name && { name: updateUserDto.name }),
         ...(updateUserDto.role && { role: updateUserDto.role }),
-        ...(updateUserDto.isActive !== undefined && { isActive: updateUserDto.isActive }),
+        ...(updateUserDto.isActive !== undefined && {
+          isActive: updateUserDto.isActive,
+        }),
       },
     });
 
-    const { passwordHash: _ph, refreshTokenHash: _rth, ...result } = updatedUser;
+    const {
+      passwordHash: _ph,
+      refreshTokenHash: _rth,
+      ...result
+    } = updatedUser;
     return result;
   }
 
-  async deactivate(id: string): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'>> {
+  async deactivate(
+    id: string,
+  ): Promise<Omit<User, 'passwordHash' | 'refreshTokenHash'>> {
     await this.findById(id);
 
     const deactivatedUser = await this.prisma.user.update({
@@ -124,7 +139,11 @@ export class UsersService {
       data: { isActive: false },
     });
 
-    const { passwordHash: _ph, refreshTokenHash: _rth, ...result } = deactivatedUser;
+    const {
+      passwordHash: _ph,
+      refreshTokenHash: _rth,
+      ...result
+    } = deactivatedUser;
     return result;
   }
 }

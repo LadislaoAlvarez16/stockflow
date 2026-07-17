@@ -1,33 +1,42 @@
-import { IsString, IsNotEmpty, MaxLength, IsUUID, IsOptional, IsDateString, IsNumber, IsPositive } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsUUID,
+  IsOptional,
+  IsDateString,
+  IsNumber,
+  IsPositive,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateBatchDto {
-  @IsString() 
-  @IsNotEmpty() 
+  @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
   batchNumber: string;
 
   @IsUUID()
   productId: string;
 
-  @IsUUID() 
+  @IsUUID()
   @IsOptional()
   supplierId?: string;
 
-  @IsDateString() 
+  @IsDateString()
   @IsOptional()
   expiryDate?: string;
 
-  @IsDateString() 
+  @IsDateString()
   @IsOptional()
   manufacturingDate?: string;
 
-  @IsNumber() 
-  @IsPositive() 
+  @IsNumber()
+  @IsPositive()
   @Type(() => Number)
   initialQuantity: number;
 
-  @IsString() 
+  @IsString()
   @IsOptional()
   notes?: string;
 }

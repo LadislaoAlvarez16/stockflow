@@ -10,7 +10,7 @@ import { Queue } from 'bullmq';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   const frontendUrl = process.env.FRONTEND_URL;
   app.enableCors({
     origin: frontendUrl || '*',
@@ -25,7 +25,9 @@ async function bootstrap() {
   const bullPassword = process.env.BULL_BOARD_PASSWORD;
 
   if (!bullUser || !bullPassword) {
-    throw new Error('FATAL ERROR: BULL_BOARD_USER and BULL_BOARD_PASSWORD must be defined in environment variables.');
+    throw new Error(
+      'FATAL ERROR: BULL_BOARD_USER and BULL_BOARD_PASSWORD must be defined in environment variables.',
+    );
   }
 
   // Bull Board Setup
@@ -52,9 +54,21 @@ async function bootstrap() {
       challenge: true,
       realm: 'Bull Board Admin Area',
     }),
-    serverAdapter.getRouter()
+    serverAdapter.getRouter(),
   );
-  
+
+  const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
+  const config = new DocumentBuilder()
+    .setTitle('StockFlow API')
+    .setDescription(
+      'Documentación de la API de StockFlow para gestión de inventarios y trazabilidad',
+    )
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();

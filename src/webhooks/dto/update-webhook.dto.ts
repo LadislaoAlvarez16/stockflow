@@ -1,4 +1,11 @@
-import { IsUrl, IsEnum, IsArray, ArrayMinSize, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsUrl,
+  IsEnum,
+  IsArray,
+  ArrayMinSize,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 import { WebhookEventType } from '@prisma/client';
 
 export class UpdateWebhookDto {
@@ -9,7 +16,10 @@ export class UpdateWebhookDto {
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1, { message: 'Debe seleccionar al menos un evento' })
-  @IsEnum(WebhookEventType, { each: true, message: 'Evento de webhook no válido' })
+  @IsEnum(WebhookEventType, {
+    each: true,
+    message: 'Evento de webhook no válido',
+  })
   events?: WebhookEventType[];
 
   @IsOptional()

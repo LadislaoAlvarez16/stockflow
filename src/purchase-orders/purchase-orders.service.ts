@@ -1,8 +1,17 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { GetPurchaseOrdersFilterDto } from './dto/get-purchase-orders-filter.dto';
-import { Prisma, PurchaseOrderStatus, WebhookEventType, MovementType } from '@prisma/client';
+import {
+  Prisma,
+  PurchaseOrderStatus,
+  WebhookEventType,
+  MovementType,
+} from '@prisma/client';
 import { ReceivePurchaseOrderDto } from './dto/receive-purchase-order.dto';
 import { StockService } from '../stock/stock.service';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
@@ -21,18 +30,22 @@ export class PurchaseOrdersService {
     const { supplierId, warehouseId, items } = createPurchaseOrderDto;
 
     // Validate supplier and warehouse
-    const supplier = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+    });
     if (!supplier || !supplier.isActive) {
       throw new BadRequestException('Supplier does not exist or is inactive');
     }
 
-    const warehouse = await this.prisma.warehouse.findUnique({ where: { id: warehouseId } });
+    const warehouse = await this.prisma.warehouse.findUnique({
+      where: { id: warehouseId },
+    });
     if (!warehouse || !warehouse.isActive) {
       throw new BadRequestException('Warehouse does not exist or is inactive');
     }
 
     // Validate products
-    const productIds = items.map(item => item.productId);
+    const productIds = items.map((item) => item.productId);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
     });
@@ -41,9 +54,11 @@ export class PurchaseOrdersService {
       throw new BadRequestException('One or more products do not exist');
     }
 
-    const inactiveProducts = products.filter(p => !p.isActive);
+    const inactiveProducts = products.filter((p) => !p.isActive);
     if (inactiveProducts.length > 0) {
-      throw new BadRequestException(`Cannot create order with inactive products: ${inactiveProducts.map(p => p.sku).join(', ')}`);
+      throw new BadRequestException(
+        `Cannot create order with inactive products: ${inactiveProducts.map((p) => p.sku).join(', ')}`,
+      );
     }
 
     // Create the order atomically with its items
@@ -53,7 +68,7 @@ export class PurchaseOrdersService {
         warehouseId,
         status: PurchaseOrderStatus.DRAFT,
         items: {
-          create: items.map(item => ({
+          create: items.map((item) => ({
             productId: item.productId,
             quantityOrdered: item.quantity,
             costPrice: item.costPrice,
@@ -67,7 +82,15 @@ export class PurchaseOrdersService {
   }
 
   async findAll(filters: GetPurchaseOrdersFilterDto) {
-    const { status, supplierId, warehouseId, dateFrom, dateTo, page = 1, limit = 20 } = filters;
+    const {
+      status,
+      supplierId,
+      warehouseId,
+      dateFrom,
+      dateTo,
+      page = 1,
+      limit = 20,
+    } = filters;
 
     const where: Prisma.PurchaseOrderWhereInput = {};
 
@@ -103,7 +126,7 @@ export class PurchaseOrdersService {
           warehouse: { select: { id: true, name: true } },
         },
       }),
-      this.prisma.purchaseOrder.count({ where })
+      this.prisma.purchaseOrder.count({ where }),
     ]);
 
     return {
@@ -142,7 +165,9 @@ export class PurchaseOrdersService {
     const order = await this.findOne(id);
 
     if (order.status !== PurchaseOrderStatus.DRAFT) {
-      throw new BadRequestException(`Invalid status transition. Cannot send an order in ${order.status} status.`);
+      throw new BadRequestException(
+        `Invalid status transition. Cannot send an order in ${order.status} status.`,
+      );
     }
 
     return this.prisma.purchaseOrder.update({
@@ -154,16 +179,26 @@ export class PurchaseOrdersService {
   async transitionToCancelled(id: string, userId: string = 'system') {
     const order = await this.findOne(id);
 
-    if (order.status === PurchaseOrderStatus.PARTIAL || order.status === PurchaseOrderStatus.RECEIVED) {
-      throw new BadRequestException('Cannot cancel a purchase order that has already received stock.');
+    if (
+      order.status === PurchaseOrderStatus.PARTIAL ||
+      order.status === PurchaseOrderStatus.RECEIVED
+    ) {
+      throw new BadRequestException(
+        'Cannot cancel a purchase order that has already received stock.',
+      );
     }
 
     if (order.status === PurchaseOrderStatus.CANCELLED) {
       return order; // Idempotent
     }
 
-    if (order.status !== PurchaseOrderStatus.DRAFT && order.status !== PurchaseOrderStatus.SENT) {
-      throw new BadRequestException(`Invalid status transition from ${order.status} to CANCELLED.`);
+    if (
+      order.status !== PurchaseOrderStatus.DRAFT &&
+      order.status !== PurchaseOrderStatus.SENT
+    ) {
+      throw new BadRequestException(
+        `Invalid status transition from ${order.status} to CANCELLED.`,
+      );
     }
 
     const updatedOrder = await this.prisma.purchaseOrder.update({
@@ -176,7 +211,10 @@ export class PurchaseOrdersService {
       action: 'CANCEL_PURCHASE_ORDER',
       entity: 'PurchaseOrder',
       entityId: id,
-      metadata: { fromStatus: order.status, toStatus: PurchaseOrderStatus.CANCELLED },
+      metadata: {
+        fromStatus: order.status,
+        toStatus: PurchaseOrderStatus.CANCELLED,
+      },
     });
 
     return updatedOrder;
@@ -186,20 +224,31 @@ export class PurchaseOrdersService {
     // Validación Inicial
     const order = await this.findOne(id);
 
-    if (order.status !== PurchaseOrderStatus.SENT && order.status !== PurchaseOrderStatus.PARTIAL) {
-      throw new BadRequestException(`Cannot receive items for an order in ${order.status} status.`);
+    if (
+      order.status !== PurchaseOrderStatus.SENT &&
+      order.status !== PurchaseOrderStatus.PARTIAL
+    ) {
+      throw new BadRequestException(
+        `Cannot receive items for an order in ${order.status} status.`,
+      );
     }
 
     // Validación de Ítems
     for (const itemDto of dto.items) {
-      const orderItem = order.items.find(i => i.productId === itemDto.productId);
+      const orderItem = order.items.find(
+        (i) => i.productId === itemDto.productId,
+      );
       if (!orderItem) {
-        throw new BadRequestException(`Product ${itemDto.productId} is not part of this purchase order.`);
+        throw new BadRequestException(
+          `Product ${itemDto.productId} is not part of this purchase order.`,
+        );
       }
 
       const maxAllowed = orderItem.quantityOrdered - orderItem.quantityReceived;
       if (itemDto.quantityReceived > maxAllowed) {
-        throw new BadRequestException(`Cannot receive ${itemDto.quantityReceived} of product ${itemDto.productId}. Maximum allowed is ${maxAllowed}.`);
+        throw new BadRequestException(
+          `Cannot receive ${itemDto.quantityReceived} of product ${itemDto.productId}. Maximum allowed is ${maxAllowed}.`,
+        );
       }
     }
 
@@ -218,8 +267,12 @@ export class PurchaseOrdersService {
         where: { purchaseOrderId: id },
       });
 
-      const allReceived = updatedItems.every(i => i.quantityReceived === i.quantityOrdered);
-      const newStatus = allReceived ? PurchaseOrderStatus.RECEIVED : PurchaseOrderStatus.PARTIAL;
+      const allReceived = updatedItems.every(
+        (i) => i.quantityReceived === i.quantityOrdered,
+      );
+      const newStatus = allReceived
+        ? PurchaseOrderStatus.RECEIVED
+        : PurchaseOrderStatus.PARTIAL;
 
       // Actualizar orden
       return tx.purchaseOrder.update({
@@ -230,25 +283,33 @@ export class PurchaseOrdersService {
 
     // Impacto en Stock (Fase 2 - Post-Transacción)
     for (const itemDto of dto.items) {
-      const orderItem = order.items.find(i => i.productId === itemDto.productId);
-      
-      await this.stockService.createMovement({
-        productId: itemDto.productId,
-        warehouseId: dto.warehouseId,
-        type: MovementType.INBOUND,
-        quantity: itemDto.quantityReceived,
-        reference: dto.reference,
-        // No pasamos costPrice porque createMovement no lo soporta directamente en el core DTO actual
-      }, userId);
+      const orderItem = order.items.find(
+        (i) => i.productId === itemDto.productId,
+      );
+
+      await this.stockService.createMovement(
+        {
+          productId: itemDto.productId,
+          warehouseId: dto.warehouseId,
+          type: MovementType.INBOUND,
+          quantity: itemDto.quantityReceived,
+          reference: dto.reference,
+          // No pasamos costPrice porque createMovement no lo soporta directamente en el core DTO actual
+        },
+        userId,
+      );
     }
 
     // Webhook
     if (updatedOrder.status === PurchaseOrderStatus.RECEIVED) {
-      await this.webhookDispatcher.dispatch(WebhookEventType.purchase_order_received, {
-        purchaseOrderId: updatedOrder.id,
-        supplierId: updatedOrder.supplierId,
-        warehouseId: updatedOrder.warehouseId,
-      });
+      await this.webhookDispatcher.dispatch(
+        WebhookEventType.purchase_order_received,
+        {
+          purchaseOrderId: updatedOrder.id,
+          supplierId: updatedOrder.supplierId,
+          warehouseId: updatedOrder.warehouseId,
+        },
+      );
     }
 
     return updatedOrder;

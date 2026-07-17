@@ -2,7 +2,11 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { MailService } from '../mail.service';
-import { lowStockTemplate, outOfStockTemplate, dailyReportTemplate } from '../templates';
+import {
+  lowStockTemplate,
+  outOfStockTemplate,
+  dailyReportTemplate,
+} from '../templates';
 
 interface SendEmailPayload {
   template: string;
@@ -44,11 +48,13 @@ export class NotificationsWorker extends WorkerHost {
     switch (payload.template) {
       case 'low-stock-alert':
         html = lowStockTemplate(payload as any);
-        subject = subject || `Alerta de Stock Crítico - Producto ${payload.productId}`;
+        subject =
+          subject || `Alerta de Stock Crítico - Producto ${payload.productId}`;
         break;
       case 'out-of-stock-alert':
         html = outOfStockTemplate(payload as any);
-        subject = subject || `¡QUIEBRE DE STOCK! - Producto ${payload.productId}`;
+        subject =
+          subject || `¡QUIEBRE DE STOCK! - Producto ${payload.productId}`;
         break;
       case 'daily-report':
         html = dailyReportTemplate(payload as any);
@@ -58,7 +64,10 @@ export class NotificationsWorker extends WorkerHost {
         throw new Error(`Unknown email template: ${payload.template}`);
     }
 
-    const to = payload.to && payload.to.length > 0 ? payload.to : [this.defaultAdminEmail];
+    const to =
+      payload.to && payload.to.length > 0
+        ? payload.to
+        : [this.defaultAdminEmail];
 
     await this.mailService.sendMail({
       to,
@@ -66,6 +75,8 @@ export class NotificationsWorker extends WorkerHost {
       html,
     });
 
-    this.logger.log(`Email enviado con éxito a ${to.join(', ')} usando template ${payload.template}`);
+    this.logger.log(
+      `Email enviado con éxito a ${to.join(', ')} usando template ${payload.template}`,
+    );
   }
 }

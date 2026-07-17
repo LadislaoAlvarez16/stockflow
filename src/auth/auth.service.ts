@@ -41,16 +41,22 @@ export class AuthService {
     const payload = { email: user.email, sub: user.id, role: user.role };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: (this.configService.get<string>('JWT_EXPIRATION') || '15m') as "15m",
+      expiresIn: (this.configService.get<string>('JWT_EXPIRATION') ||
+        '15m') as '15m',
     });
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: (this.configService.get<string>('REFRESH_TOKEN_EXPIRATION') || '7d') as "7d",
+      expiresIn: (this.configService.get<string>('REFRESH_TOKEN_EXPIRATION') ||
+        '7d') as '7d',
     });
 
     const hash = await this.hashData(refreshToken);
     await this.usersService.updateRefreshTokenHash(user.id, hash);
 
-    const { passwordHash: _ph, refreshTokenHash: _rth, ...userWithoutPasswordAndHash } = user;
+    const {
+      passwordHash: _ph,
+      refreshTokenHash: _rth,
+      ...userWithoutPasswordAndHash
+    } = user;
 
     return {
       accessToken,
@@ -63,7 +69,9 @@ export class AuthService {
     let payload: any;
     try {
       payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get<string>('JWT_SECRET') || 'change-this-in-production',
+        secret:
+          this.configService.get<string>('JWT_SECRET') ||
+          'change-this-in-production',
       });
     } catch (e) {
       throw new UnauthorizedException('Access denied');
@@ -74,7 +82,10 @@ export class AuthService {
       throw new UnauthorizedException('Access denied');
     }
 
-    const isRefreshTokenValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+    const isRefreshTokenValid = await bcrypt.compare(
+      refreshToken,
+      user.refreshTokenHash,
+    );
     if (!isRefreshTokenValid) {
       throw new UnauthorizedException('Access denied');
     }
@@ -82,16 +93,22 @@ export class AuthService {
     const newPayload = { email: user.email, sub: user.id, role: user.role };
 
     const newAccessToken = this.jwtService.sign(newPayload, {
-      expiresIn: (this.configService.get<string>('JWT_EXPIRATION') || '15m') as "15m",
+      expiresIn: (this.configService.get<string>('JWT_EXPIRATION') ||
+        '15m') as '15m',
     });
     const newRefreshToken = this.jwtService.sign(newPayload, {
-      expiresIn: (this.configService.get<string>('REFRESH_TOKEN_EXPIRATION') || '7d') as "7d",
+      expiresIn: (this.configService.get<string>('REFRESH_TOKEN_EXPIRATION') ||
+        '7d') as '7d',
     });
 
     const hash = await this.hashData(newRefreshToken);
     await this.usersService.updateRefreshTokenHash(user.id, hash);
 
-    const { passwordHash: _ph, refreshTokenHash: _rth, ...userWithoutPasswordAndHash } = user;
+    const {
+      passwordHash: _ph,
+      refreshTokenHash: _rth,
+      ...userWithoutPasswordAndHash
+    } = user;
 
     return {
       accessToken: newAccessToken,

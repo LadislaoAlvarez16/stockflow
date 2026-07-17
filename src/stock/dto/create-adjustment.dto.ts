@@ -1,4 +1,14 @@
-import { IsUUID, IsNumber, IsPositive, IsString, IsNotEmpty, IsIn, IsOptional, IsArray, ArrayMaxSize } from 'class-validator';
+import {
+  IsUUID,
+  IsNumber,
+  IsPositive,
+  IsString,
+  IsNotEmpty,
+  IsIn,
+  IsOptional,
+  IsArray,
+  ArrayMaxSize,
+} from 'class-validator';
 
 export class CreateAdjustmentDto {
   @IsUUID()

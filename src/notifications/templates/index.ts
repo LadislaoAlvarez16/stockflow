@@ -46,17 +46,32 @@ export const dailyReportTemplate = (data: {
   newAlerts: Array<{ productId: string; type: string }>;
   topProducts: Array<{ productId: string; count: number }>;
 }) => {
-  const movementsHtml = data.movementsByType.length > 0
-    ? data.movementsByType.map(m => `<li>${m.type}: <strong>${m.count}</strong> operación(es)</li>`).join('')
-    : '<li>No hubo movimientos relevantes.</li>';
+  const movementsHtml =
+    data.movementsByType.length > 0
+      ? data.movementsByType
+          .map(
+            (m) =>
+              `<li>${m.type}: <strong>${m.count}</strong> operación(es)</li>`,
+          )
+          .join('')
+      : '<li>No hubo movimientos relevantes.</li>';
 
-  const newAlertsHtml = data.newAlerts.length > 0
-    ? data.newAlerts.map(a => `<li>Prod ID: ${a.productId} (${a.type})</li>`).join('')
-    : '<li>Ninguna nueva alerta en las últimas 24hs.</li>';
+  const newAlertsHtml =
+    data.newAlerts.length > 0
+      ? data.newAlerts
+          .map((a) => `<li>Prod ID: ${a.productId} (${a.type})</li>`)
+          .join('')
+      : '<li>Ninguna nueva alerta en las últimas 24hs.</li>';
 
-  const topProductsHtml = data.topProducts.length > 0
-    ? data.topProducts.map(p => `<li>Prod ID: ${p.productId} - <strong>${p.count}</strong> movimiento(s)</li>`).join('')
-    : '<li>Sin datos.</li>';
+  const topProductsHtml =
+    data.topProducts.length > 0
+      ? data.topProducts
+          .map(
+            (p) =>
+              `<li>Prod ID: ${p.productId} - <strong>${p.count}</strong> movimiento(s)</li>`,
+          )
+          .join('')
+      : '<li>Sin datos.</li>';
 
   return `
     <div style="font-family: sans-serif; padding: 20px; color: #333;">

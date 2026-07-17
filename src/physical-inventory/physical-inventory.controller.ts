@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Param, UseInterceptors, UploadedFile, Body, Res, ParseUUIDPipe, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  UseInterceptors,
+  UploadedFile,
+  Body,
+  Res,
+  ParseUUIDPipe,
+  BadRequestException,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { PhysicalInventoryService } from './physical-inventory.service';
@@ -12,7 +23,7 @@ import { ReportsService } from '../reports/reports.service';
 export class PhysicalInventoryController {
   constructor(
     private readonly physicalInventoryService: PhysicalInventoryService,
-    private readonly reportsService: ReportsService
+    private readonly reportsService: ReportsService,
   ) {}
 
   @Get('template')
@@ -29,7 +40,11 @@ export class PhysicalInventoryController {
     @CurrentUser() user: any,
   ) {
     const userId = user.id || user.sub;
-    return this.physicalInventoryService.processUpload(file, warehouseId, userId);
+    return this.physicalInventoryService.processUpload(
+      file,
+      warehouseId,
+      userId,
+    );
   }
 
   @Get()
@@ -48,21 +63,27 @@ export class PhysicalInventoryController {
   }
 
   @Get(':id/report')
-  async getSessionReport(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+  async getSessionReport(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ) {
     const session = await this.physicalInventoryService.getSession(id);
 
     if (session && session.status === 'processing') {
-      throw new BadRequestException('La sesión de inventario aún no ha finalizado');
+      throw new BadRequestException(
+        'La sesión de inventario aún no ha finalizado',
+      );
     }
 
-    const pdfBuffer = await this.reportsService.generateInventorySessionReport(id);
-    
+    const pdfBuffer =
+      await this.reportsService.generateInventorySessionReport(id);
+
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="inventory-session-\${id}.pdf"`,
       'Content-Length': pdfBuffer.length,
     });
-    
+
     res.end(pdfBuffer);
   }
 }

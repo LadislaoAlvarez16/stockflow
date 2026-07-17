@@ -11,27 +11,45 @@ export class AuditService {
    * Registra una acción de auditoría sin bloquear la ejecución.
    * Promesa desconectada (Fire and forget) para no enlentecer los flujos de negocio.
    */
-  log(data: { userId: string; action: string; entity?: string; entityId?: string; metadata?: any }) {
-    this.prisma.auditLog.create({
-      data: {
-        userId: data.userId,
-        action: data.action,
-        entity: data.entity,
-        entityId: data.entityId,
-        metadata: data.metadata || {},
-      },
-    }).catch(err => {
-      this.logger.error(`Error escribiendo audit log para ${data.action}`, err);
-    });
+  log(data: {
+    userId: string;
+    action: string;
+    entity?: string;
+    entityId?: string;
+    metadata?: any;
+  }) {
+    this.prisma.auditLog
+      .create({
+        data: {
+          userId: data.userId,
+          action: data.action,
+          entity: data.entity,
+          entityId: data.entityId,
+          metadata: data.metadata || {},
+        },
+      })
+      .catch((err) => {
+        this.logger.error(
+          `Error escribiendo audit log para ${data.action}`,
+          err,
+        );
+      });
   }
 
-  async getLogs(query: { userId?: string; entity?: string; dateFrom?: string; dateTo?: string; cursor?: string; take?: number }) {
+  async getLogs(query: {
+    userId?: string;
+    entity?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    cursor?: string;
+    take?: number;
+  }) {
     const take = query.take || 50;
-    
+
     const where: any = {};
     if (query.userId) where.userId = query.userId;
     if (query.entity) where.entity = query.entity;
-    
+
     if (query.dateFrom || query.dateTo) {
       where.createdAt = {};
       if (query.dateFrom) where.createdAt.gte = new Date(query.dateFrom);

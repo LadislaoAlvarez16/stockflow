@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 import { PrismaService } from '../common/prisma.service';
@@ -11,9 +16,11 @@ export class WarehousesService {
     const existing = await this.prisma.warehouse.findUnique({
       where: { code: createWarehouseDto.code },
     });
-    
+
     if (existing) {
-      throw new ConflictException(`Warehouse with code ${createWarehouseDto.code} already exists`);
+      throw new ConflictException(
+        `Warehouse with code ${createWarehouseDto.code} already exists`,
+      );
     }
 
     try {
@@ -22,7 +29,9 @@ export class WarehousesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(`Warehouse with code ${createWarehouseDto.code} already exists`);
+        throw new ConflictException(
+          `Warehouse with code ${createWarehouseDto.code} already exists`,
+        );
       }
       throw new InternalServerErrorException('Failed to create warehouse');
     }
@@ -52,7 +61,9 @@ export class WarehousesService {
         where: { code: updateWarehouseDto.code },
       });
       if (existing && existing.id !== id) {
-        throw new ConflictException(`Warehouse with code ${updateWarehouseDto.code} already exists`);
+        throw new ConflictException(
+          `Warehouse with code ${updateWarehouseDto.code} already exists`,
+        );
       }
     }
 
@@ -63,7 +74,9 @@ export class WarehousesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(`Warehouse with code ${updateWarehouseDto.code} already exists`);
+        throw new ConflictException(
+          `Warehouse with code ${updateWarehouseDto.code} already exists`,
+        );
       }
       throw new InternalServerErrorException('Failed to update warehouse');
     }

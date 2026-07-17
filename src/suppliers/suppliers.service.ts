@@ -1,8 +1,8 @@
-import { 
-  Injectable, 
-  ConflictException, 
-  NotFoundException, 
-  InternalServerErrorException
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
@@ -21,7 +21,9 @@ export class SuppliersService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-          throw new ConflictException('Supplier with this taxId already exists');
+          throw new ConflictException(
+            'Supplier with this taxId already exists',
+          );
         }
       }
       throw new InternalServerErrorException('Error creating supplier');
@@ -55,7 +57,9 @@ export class SuppliersService {
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-          throw new ConflictException('Supplier with this taxId already exists');
+          throw new ConflictException(
+            'Supplier with this taxId already exists',
+          );
         }
       }
       throw new InternalServerErrorException('Error updating supplier');

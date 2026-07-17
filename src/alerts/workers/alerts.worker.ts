@@ -27,12 +27,15 @@ export class AlertsWorker extends WorkerHost {
 
     // 1. Si currentQuantity > minStock -> return temprano
     if (currentQuantity > minStock) {
-      this.logger.debug(`Stock normal para el producto ${productId}. Cantidad actual: ${currentQuantity}, mínimo: ${minStock}. Abortando alerta.`);
+      this.logger.debug(
+        `Stock normal para el producto ${productId}. Cantidad actual: ${currentQuantity}, mínimo: ${minStock}. Abortando alerta.`,
+      );
       return;
     }
 
     // 2. Determinar type
-    const type = currentQuantity === 0 ? AlertType.OUT_OF_STOCK : AlertType.LOW_STOCK;
+    const type =
+      currentQuantity === 0 ? AlertType.OUT_OF_STOCK : AlertType.LOW_STOCK;
 
     // 3. Formatear mensaje
     const message = `Stock ${type === AlertType.OUT_OF_STOCK ? 'agotado' : 'crítico'}: ${currentQuantity} unidades disponibles (mínimo configurado: ${minStock})`;
@@ -47,7 +50,9 @@ export class AlertsWorker extends WorkerHost {
 
     // 5. Evaluar resultado
     if (!alert) {
-      this.logger.debug(`Alerta duplicada ya activa para el producto ${productId} en el depósito ${warehouseId}. Omitiendo.`);
+      this.logger.debug(
+        `Alerta duplicada ya activa para el producto ${productId} en el depósito ${warehouseId}. Omitiendo.`,
+      );
       return;
     }
 
@@ -55,7 +60,10 @@ export class AlertsWorker extends WorkerHost {
 
     // Encolar notificación
     await this.notificationsQueue.add('send-email', {
-      template: type === AlertType.OUT_OF_STOCK ? 'out-of-stock-alert' : 'low-stock-alert',
+      template:
+        type === AlertType.OUT_OF_STOCK
+          ? 'out-of-stock-alert'
+          : 'low-stock-alert',
       alertId: alert.id,
       productId,
       warehouseId,
@@ -66,10 +74,11 @@ export class AlertsWorker extends WorkerHost {
     this.logger.log(`Notificación encolada para la alerta ${alert.id}`);
 
     // Emitir webhook
-    const webhookEvent = type === AlertType.OUT_OF_STOCK 
-      ? WebhookEventType.stock_out 
-      : WebhookEventType.stock_low;
-      
+    const webhookEvent =
+      type === AlertType.OUT_OF_STOCK
+        ? WebhookEventType.stock_out
+        : WebhookEventType.stock_low;
+
     await this.webhookDispatcherService.dispatch(webhookEvent, {
       alertId: alert.id,
       productId,

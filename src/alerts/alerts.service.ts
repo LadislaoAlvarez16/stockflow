@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AlertType, AlertStatus, Prisma } from '@prisma/client';
 import { GetAlertsFilterDto } from './dto/get-alerts-filter.dto';

@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
@@ -28,7 +33,14 @@ export class ProductsService {
   }
 
   async findAll(query: QueryProductDto) {
-    const { search, category, isActive, lowStock, page = 1, limit = 10 } = query;
+    const {
+      search,
+      category,
+      isActive,
+      lowStock,
+      page = 1,
+      limit = 10,
+    } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductWhereInput = {};
@@ -89,11 +101,11 @@ export class ProductsService {
       where: { id },
       include: { stocks: true },
     });
-    
+
     if (!product) {
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
-    
+
     return product;
   }
 
@@ -106,7 +118,7 @@ export class ProductsService {
       const existingProduct = await this.prisma.product.findUnique({
         where: { sku: updateProductDto.sku },
       });
-      
+
       if (existingProduct && existingProduct.id !== id) {
         throw new ConflictException('SKU already exists');
       }

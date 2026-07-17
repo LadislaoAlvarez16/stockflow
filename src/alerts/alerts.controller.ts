@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Patch, Query, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { AlertsService } from './alerts.service';
 import { GetAlertsFilterDto } from './dto/get-alerts-filter.dto';
 import { Roles } from '../common/decorators/roles.decorator';

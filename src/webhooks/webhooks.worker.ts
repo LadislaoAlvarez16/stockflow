@@ -50,8 +50,8 @@ export class WebhooksWorker extends WorkerHost {
       });
 
       statusCode = response.status;
-      responseBody = response.data 
-        ? JSON.stringify(response.data).substring(0, 500) 
+      responseBody = response.data
+        ? JSON.stringify(response.data).substring(0, 500)
         : 'OK';
 
       // 5. Registrar entrega exitosa
@@ -64,15 +64,16 @@ export class WebhooksWorker extends WorkerHost {
         duration,
         attemptNumber,
       });
-
-    } catch (error: any) {
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number, data?: unknown }, message?: string };
       const duration = Date.now() - startTime;
       statusCode = error.response?.status || null;
-      
+
       const rawError = error.response?.data || error.message;
-      responseBody = typeof rawError === 'string' 
-        ? rawError.substring(0, 500) 
-        : JSON.stringify(rawError).substring(0, 500);
+      responseBody =
+        typeof rawError === 'string'
+          ? rawError.substring(0, 500)
+          : JSON.stringify(rawError).substring(0, 500);
 
       // Registrar entrega fallida
       await this.logDelivery({
@@ -85,7 +86,9 @@ export class WebhooksWorker extends WorkerHost {
       });
 
       // Importante: re-lanzar error para que BullMQ registre el backoff
-      this.logger.error(`Webhook fallido para suscripcion ${subscriptionId}, evento ${event}. Attempt: ${attemptNumber}. Error: ${error.message}`);
+      this.logger.error(
+        `Webhook fallido para suscripcion ${subscriptionId}, evento ${event}. Attempt: ${attemptNumber}. Error: ${error.message}`,
+      );
       throw error;
     }
   }

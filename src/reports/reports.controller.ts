@@ -18,32 +18,60 @@ export class ReportsController {
       {
         id: 'stock-valuation',
         name: 'Reporte de Valorización de Stock',
-        description: 'Calcula el valor financiero del stock materializado por categoría.',
+        description:
+          'Calcula el valor financiero del stock materializado por categoría.',
         url: '/reports/stock-valuation',
         filters: [
-          { name: 'warehouseId', type: 'string', required: false, description: 'Filtrar por ID de depósito' }
-        ]
+          {
+            name: 'warehouseId',
+            type: 'string',
+            required: false,
+            description: 'Filtrar por ID de depósito',
+          },
+        ],
       },
       {
         id: 'movement-history',
         name: 'Historial de Movimientos',
-        description: 'Detalle de todos los movimientos (INBOUND, OUTBOUND, TRANSFER, ADJUSTMENT). Límite de 90 días.',
+        description:
+          'Detalle de todos los movimientos (INBOUND, OUTBOUND, TRANSFER, ADJUSTMENT). Límite de 90 días.',
         url: '/reports/movement-history',
         filters: [
-          { name: 'dateFrom', type: 'date', required: true, description: 'Fecha de inicio (ISO 8601)' },
-          { name: 'dateTo', type: 'date', required: true, description: 'Fecha de fin (ISO 8601)' }
-        ]
+          {
+            name: 'dateFrom',
+            type: 'date',
+            required: true,
+            description: 'Fecha de inicio (ISO 8601)',
+          },
+          {
+            name: 'dateTo',
+            type: 'date',
+            required: true,
+            description: 'Fecha de fin (ISO 8601)',
+          },
+        ],
       },
       {
         id: 'expiry',
         name: 'Lotes por Vencer',
-        description: 'Listado de lotes con stock, ordenados por fecha de vencimiento más próxima.',
+        description:
+          'Listado de lotes con stock, ordenados por fecha de vencimiento más próxima.',
         url: '/reports/expiry',
         filters: [
-          { name: 'warehouseId', type: 'string', required: false, description: 'Filtrar por ID de depósito' },
-          { name: 'expiresInDays', type: 'number', required: false, description: 'Mostrar solo lotes que venzan en los próximos N días' }
-        ]
-      }
+          {
+            name: 'warehouseId',
+            type: 'string',
+            required: false,
+            description: 'Filtrar por ID de depósito',
+          },
+          {
+            name: 'expiresInDays',
+            type: 'number',
+            required: false,
+            description: 'Mostrar solo lotes que venzan en los próximos N días',
+          },
+        ],
+      },
     ];
   }
 
@@ -53,7 +81,8 @@ export class ReportsController {
     @Query('warehouseId') warehouseId: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.reportsService.generateStockValuation(warehouseId);
+    const pdfBuffer =
+      await this.reportsService.generateStockValuation(warehouseId);
     this.sendPdfResponse(res, pdfBuffer, 'stock-valuation');
   }
 
@@ -64,7 +93,10 @@ export class ReportsController {
     @Query('dateTo') dateTo: string,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.reportsService.generateMovementHistory(dateFrom, dateTo);
+    const pdfBuffer = await this.reportsService.generateMovementHistory(
+      dateFrom,
+      dateTo,
+    );
     this.sendPdfResponse(res, pdfBuffer, 'movement-history');
   }
 
@@ -76,8 +108,8 @@ export class ReportsController {
     @Res() res: Response,
   ) {
     const pdfBuffer = await this.reportsService.generateExpiryReport(
-      warehouseId, 
-      expiresInDays ? parseInt(expiresInDays, 10) : undefined
+      warehouseId,
+      expiresInDays ? parseInt(expiresInDays, 10) : undefined,
     );
     this.sendPdfResponse(res, pdfBuffer, 'expiry-report');
   }

@@ -8,7 +8,13 @@ import { SerialNumbersModule } from '../serial-numbers/serial-numbers.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 
 @Module({
-  imports: [CommonModule, AlertsModule, BatchesModule, SerialNumbersModule, WebhooksModule],
+  imports: [
+    CommonModule,
+    AlertsModule,
+    BatchesModule,
+    SerialNumbersModule,
+    WebhooksModule,
+  ],
   controllers: [StockController],
   providers: [StockService],
   exports: [StockService],

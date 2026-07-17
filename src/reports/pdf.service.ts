@@ -30,7 +30,7 @@ export class PdfService {
           right: '15mm',
         },
       });
-      
+
       // Puppeteer returns a Uint8Array in recent versions, so convert to Buffer
       return Buffer.from(pdfUint8Array);
     } catch (error) {

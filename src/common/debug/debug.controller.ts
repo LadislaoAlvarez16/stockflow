@@ -1,5 +1,11 @@
 // TEMPORAL: remover o proteger con flag de entorno antes de producción
-import { Controller, Post, Param, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Param,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { AlertsCronService } from '../../alerts/alerts.cron';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
@@ -14,6 +20,9 @@ export class DebugController {
 
   @Post(':name')
   async runCron(@Param('name') name: string) {
-    return { success: false, message: 'Cron functionality disabled in Phase 3' };
+    return {
+      success: false,
+      message: 'Cron functionality disabled in Phase 3',
+    };
   }
 }

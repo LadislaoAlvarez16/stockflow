@@ -4,7 +4,7 @@
 
 **Sistema de control de inventario multi-depósito con trazabilidad inmutable, automatización y arquitectura de nivel producción.**
 
-Proyecto de portfolio técnico — no es un tutorial de CRUD, es un sistema diseñado para tolerar alta concurrencia y proteger la integridad de los datos como lo usaría una distribuidora real.
+Proyecto de portfolio técnico diseñado para tolerar alta concurrencia, prevenir Race Conditions y proteger la integridad absoluta de los datos transaccionales, resolviendo el problema clásico de las discrepancias de inventario en entornos B2B.
 
 [![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -12,112 +12,90 @@ Proyecto de portfolio técnico — no es un tutorial de CRUD, es un sistema dise
 [![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat&logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 
-[Decisiones de arquitectura](./.ai-context/DECISIONS.md)
+[Decisiones de Arquitectura](./.ai-context/DECISIONS.md)
 
 </div>
 
 ---
 
-## 🎯 ¿Qué es StockFlow?
+## 🎯 El Problema a Resolver
 
-StockFlow es un backend y motor transaccional construido para resolver el problema clásico de las distribuidoras: la discrepancia entre el stock físico y el del sistema. 
+En empresas de distribución o retail, el inventario físico rara vez coincide con el del sistema debido a **condiciones de carrera** (dos operadores retirando el último ítem a la vez), **falta de trazabilidad** (mutaciones directas sobre el balance actual) y **errores de importación masiva** sin validaciones. 
 
-**Su principio no negociable:** El stock nunca se modifica directamente (no hay `UPDATE stock SET quantity = ...`). Todo cambio de inventario es un **movimiento registrado e inmutable**. 
-
----
-
-## ✨ Características (Fase 3 Completada)
-
-- **Sistema de webhooks asíncronos con colas de reintentos (BullMQ) y firmas criptográficas HMAC-SHA256 — Arquitectura de integración de nivel producción.**
-- **Trazabilidad bidireccional por lote (FEFO) y número de serie con proyecciones materializadas concurrentes.**
-- **Auth & RBAC Dual:** Autenticación sin estado (Stateless JWT) con tres roles estrictos (`ADMIN`, `OPERATOR`, `VIEWER`). Los permisos se chequean criptográficamente sin asediar a la base de datos por cada request.
-- **Motor de Stock Inmutable:** Las operaciones de inventario se gestionan a través de transacciones ACID.
-- **ABM de Catálogos:** Gestión integral de Productos y Depósitos con "soft-deletes" para proteger la integridad referencial.
-- **Motor ETL Masivo e Inventario Físico:** Pipeline de ingesta por chunks para archivos CSV (Productos, Stock Inicial, Movimientos). Soporte `upsert` idempotente y tolerancia a fallos parciales (acumula errores fila por fila sin abortar el bloque) garantizando UX fluida para operadores.
-- **Motor de Reportes PDF:** Generación nativa de comprobantes y listados (Puppeteer + HTML/CSS inyectado dinámicamente) sin degradar la memoria del servidor.
-- **Dashboard Operativo:** Endpoints de métricas preparadas para dashboards analíticos.
+**La Solución StockFlow:** El stock nunca se modifica directamente (`UPDATE stock SET quantity = ...`). Todo cambio de inventario es un **movimiento registrado, inmutable y ordenado algorítmicamente**.
 
 ---
 
-## 🏗️ Decisiones Arquitectónicas Clave
+## ✨ Características Principales
 
-Este proyecto está construido para demostrar madurez en la toma de decisiones técnicas (trade-offs):
-
-### 1. Ledger Inmutable (Tabla Doble)
-En lugar de mutar un campo `quantity`, StockFlow escribe en `stock_movements` (el historial inmutable) y proyecta el resultado en `stocks` (tabla materializada para lecturas rápidas) dentro de la **misma transacción de PostgreSQL**. Si ocurre un fallo, no queda nada a medias. Esto garantiza auditorías perfectas.
-
-### 2. Transacciones Atómicas y Concurrencia
-Se utiliza **Pessimistic Locking** (`SELECT ... FOR UPDATE`) a nivel fila en PostgreSQL durante las mutaciones de stock. Esto elimina de raíz las condiciones de carrera (Race Conditions) que ocurren cuando dos operadores intentan retirar la última unidad de un producto al mismo tiempo. Además, en operaciones multi-depósito (Transferencias), los locks se adquieren en orden alfanumérico para evitar *Deadlocks*.
-
-### 3. Procesamiento ETL Seguro
-El importador masivo no lanza miles de queries a la base de datos ni carga a memoria arrays insostenibles. Utiliza un `Map` (HashMap) para resolver SKUs en tiempo constante `O(1)`, implementa un límite estricto de seguridad (1000 filas) y controla la **Idempotencia** (si subes el mismo remito dos veces, el sistema omite el segundo ingreso silenciosamente en lugar de duplicar el stock).
+- **Arquitectura Inmutable (Ledger Double-Entry):** Las operaciones se registran como inmutables y se proyectan sobre balances mediante transacciones ACID strictas.
+- **Concurrencia Cero Fallos (Pessimistic Locking):** Manejo nativo de `SELECT ... FOR UPDATE`. En operaciones complejas (transferencias multi-depósito), el motor adquiere *Locks* ordenados alfanuméricamente para eliminar la posibilidad de Deadlocks.
+- **Webhooks Asíncronos (BullMQ):** Motor de integración *Event-Driven* con reintentos exponenciales y firmas criptográficas HMAC-SHA256 para comunicación segura entre microservicios o sistemas legacy.
+- **Auth & RBAC Dual:** Autenticación por JWT (Stateless) con guardias de permisos a nivel Endpoint y Field.
+- **Swagger / OpenAPI:** API completamente documentada e interactiva.
+- **ETL Idempotente:** Ingesta masiva segura de archivos que absorbe errores fila por fila y evita inserciones duplicadas (Idempotencia `O(1)` con Maps).
+- **Trazabilidad de Lote (FEFO):** Seguimiento extremo por Lotes de Vencimiento y Números de Serie unitarios.
 
 ---
 
 ## 💻 Stack Tecnológico
 
-| Tecnología | Rol en el ecosistema |
+| Tecnología | Rol en el Ecosistema |
 |------------|----------------------|
-| **NestJS** | Framework core, aportando Inyección de Dependencias y arquitectura modular estricta. |
-| **Prisma** | ORM con tipado fuerte de extremo a extremo y gestión determinística de transacciones. |
-| **PostgreSQL** | Fuente de verdad absoluta. Transacciones ACID y bloqueos a nivel fila. |
-| **Docker** | Infraestructura reproducible. Despliegue de DB y API mediante `docker-compose`. |
+| **NestJS** | Inyección de Dependencias, Módulos, Interceptors y Guardias. |
+| **Prisma ORM**| Acceso tipado de extremo a extremo, delegando bloqueos pesimistas nativos a la BD. |
+| **PostgreSQL**| Fuente de verdad absoluta (Transaccional, ACID). |
+| **Redis** | Cola en memoria ultra-rápida administrando jobs (BullMQ). |
+| **Jest** | Unit Testing mockeado comprobando la consistencia transaccional y prevención de quiebres. |
 
 ---
 
-## 🚀 Guía de Inicio Rápido (Local)
+## 🚀 Guía de Instalación y Uso (Local)
 
-### Requisitos previos
-- Docker y Docker Compose instalados.
-- Node.js (v20+ recomendado).
+### Requisitos
+- Docker y Docker Compose
+- Node.js (v20+)
 
-### Pasos de instalación
+### Pasos
 
-1. **Clonar el repositorio y preparar el entorno:**
+1. **Clonar e Iniciar Infraestructura:**
    ```bash
    git clone https://github.com/tu-usuario/stockflow.git
    cd stockflow
    cp .env.example .env
-   ```
-
-2. **Levantar la infraestructura de base de datos:**
-   ```bash
    docker-compose up -d
    ```
 
-3. **Instalar dependencias y preparar la base de datos:**
+2. **Instalar Dependencias y Sincronizar Prisma:**
    ```bash
    npm install
    npx prisma migrate dev
    ```
 
-4. **Ejecutar el Seed (Datos de prueba iniciales):**
+3. **Ejecutar Tests y Seed de Base de Datos:**
    ```bash
+   npm test
    npm run seed
    ```
-   *Credenciales del usuario Administrador generadas por defecto:*
-   - **Email:** `admin@stockflow.local`
-   - **Password:** `admin123`
+   *(El Seed creará al admin: `admin@stockflow.local` / `admin123`)*
 
-5. **Iniciar el servidor en modo desarrollo:**
+4. **Levantar el Servidor:**
    ```bash
    npm run start:dev
    ```
-   La API estará respondiendo en `http://localhost:3000`.
 
 ---
 
-## 📁 Estructura del Proyecto
+## 📚 Documentación Interactiva (Swagger)
 
-StockFlow sigue una arquitectura modular en **NestJS**. Cada dominio de negocio tiene su propio directorio autocontenido, facilitando a futuro una eventual extracción hacia microservicios:
+Una vez que la aplicación esté corriendo, toda la documentación interactiva de la API, junto con los schemas (DTOs) y autenticación, está disponible en:
 
-- `/src/auth` — Lógica de generación y validación de tokens Stateless.
-- `/src/stock` — El motor central de movimientos inmutables.
-- `/src/imports` — El pipeline ETL de procesamiento CSV masivo.
-- `/src/products` & `/src/warehouses` — ABM de catálogos maestros.
-- `/src/alerts` — Colas y notificaciones (BullMQ - Fase 2).
+👉 **[http://localhost:3000/api/docs](http://localhost:3000/api/docs)**
+
+*(Para probar endpoints protegidos, loguéate en `/auth/login` con las credenciales admin, copiá el Token, y pegalo en el botón "Authorize" superior del Swagger).*
 
 ---
 
-## 🗺️ Roadmap (Próximas Fases)
-- **Fase 4:** Frontend Final. Implementación completa de componentes (shadcn/ui), ruteo (React Router), estado y UX completa de todas las entidades y reportes (React, Vite).
+## 🩺 Monitoreo
+
+El sistema incluye un endpoint estandarizado para Kubernetes u Orquestadores en `GET /health` que verifica en tiempo real la conexión con PostgreSQL y el ping del driver de Redis de BullMQ.

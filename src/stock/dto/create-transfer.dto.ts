@@ -1,4 +1,13 @@
-import { IsUUID, IsNumber, IsPositive, IsString, MaxLength, IsOptional, IsArray, ArrayMaxSize } from 'class-validator';
+import {
+  IsUUID,
+  IsNumber,
+  IsPositive,
+  IsString,
+  MaxLength,
+  IsOptional,
+  IsArray,
+  ArrayMaxSize,
+} from 'class-validator';
 
 export class CreateTransferDto {
   @IsUUID()

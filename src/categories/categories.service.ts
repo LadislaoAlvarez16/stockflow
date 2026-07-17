@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { PrismaService } from '../common/prisma.service';
@@ -13,7 +18,9 @@ export class CategoriesService {
     });
 
     if (existing) {
-      throw new ConflictException(`Category with name ${createCategoryDto.name} already exists`);
+      throw new ConflictException(
+        `Category with name ${createCategoryDto.name} already exists`,
+      );
     }
 
     try {
@@ -22,7 +29,9 @@ export class CategoriesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(`Category with name ${createCategoryDto.name} already exists`);
+        throw new ConflictException(
+          `Category with name ${createCategoryDto.name} already exists`,
+        );
       }
       throw new InternalServerErrorException('Failed to create category');
     }
@@ -50,7 +59,9 @@ export class CategoriesService {
         where: { name: updateCategoryDto.name },
       });
       if (existing && existing.id !== id) {
-        throw new ConflictException(`Category with name ${updateCategoryDto.name} already exists`);
+        throw new ConflictException(
+          `Category with name ${updateCategoryDto.name} already exists`,
+        );
       }
     }
 
@@ -61,7 +72,9 @@ export class CategoriesService {
       });
     } catch (error) {
       if (error.code === 'P2002') {
-        throw new ConflictException(`Category with name ${updateCategoryDto.name} already exists`);
+        throw new ConflictException(
+          `Category with name ${updateCategoryDto.name} already exists`,
+        );
       }
       throw new InternalServerErrorException('Failed to update category');
     }

@@ -1,4 +1,9 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { AuditService } from '../../audit/audit.service';
@@ -19,7 +24,7 @@ export class AuditInterceptor implements NestInterceptor {
     const userId = request.user?.sub || request.user?.id;
     const url = request.originalUrl;
     const body = request.body;
-    
+
     // Acción genérica
     const action = `HTTP_${method}_${url}`;
 

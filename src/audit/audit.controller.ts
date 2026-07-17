@@ -16,6 +16,12 @@ export class AuditController {
     @Query('dateTo') dateTo?: string,
     @Query('cursor') cursor?: string,
   ) {
-    return this.auditService.getLogs({ userId, entity, dateFrom, dateTo, cursor });
+    return this.auditService.getLogs({
+      userId,
+      entity,
+      dateFrom,
+      dateTo,
+      cursor,
+    });
   }
 }

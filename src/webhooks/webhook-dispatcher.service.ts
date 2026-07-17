@@ -53,8 +53,10 @@ export class WebhookDispatcherService {
 
       // Encolar de forma masiva
       await this.webhooksQueue.addBulk(jobs);
-      
-      this.logger.log(`Encolados \${jobs.length} webhooks para el evento \${event}`);
+
+      this.logger.log(
+        `Encolados \${jobs.length} webhooks para el evento \${event}`,
+      );
     } catch (error) {
       this.logger.error(`Error despachando webhooks para \${event}:`, error);
       // Falla silenciosa permitida aquí porque los webhooks son post-transacción
@@ -62,7 +64,11 @@ export class WebhookDispatcherService {
     }
   }
 
-  async dispatchTestEvent(subscriptionId: string, url: string, encryptedSecret: string) {
+  async dispatchTestEvent(
+    subscriptionId: string,
+    url: string,
+    encryptedSecret: string,
+  ) {
     const jobData: WebhookJobPayload = {
       subscriptionId,
       url,
@@ -71,7 +77,7 @@ export class WebhookDispatcherService {
       payload: {
         test: true,
         message: 'This is a test webhook from StockFlow',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       },
     };
 
@@ -82,6 +88,8 @@ export class WebhookDispatcherService {
       removeOnFail: false,
     });
 
-    this.logger.log(`Encolado webhook de prueba para la suscripcion \${subscriptionId}`);
+    this.logger.log(
+      `Encolado webhook de prueba para la suscripcion \${subscriptionId}`,
+    );
   }
 }

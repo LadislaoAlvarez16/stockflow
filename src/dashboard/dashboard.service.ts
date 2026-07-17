@@ -9,25 +9,28 @@ export class DashboardService {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Inicio del día local
 
-    const [activeProducts, activeWarehouses, todayMovements, lowStockResult] = await Promise.all([
-      this.prisma.product.count({ where: { isActive: true } }),
-      this.prisma.warehouse.count({ where: { isActive: true } }),
-      this.prisma.stockMovement.count({ where: { createdAt: { gte: today } } }),
-      // Raw query requerida por limitación de Prisma para comparar columnas de distintas tablas
-      this.prisma.$queryRaw<{count: bigint}[]>`
+    const [activeProducts, activeWarehouses, todayMovements, lowStockResult] =
+      await Promise.all([
+        this.prisma.product.count({ where: { isActive: true } }),
+        this.prisma.warehouse.count({ where: { isActive: true } }),
+        this.prisma.stockMovement.count({
+          where: { createdAt: { gte: today } },
+        }),
+        // Raw query requerida por limitación de Prisma para comparar columnas de distintas tablas
+        this.prisma.$queryRaw<{ count: bigint }[]>`
         SELECT COUNT(*)::bigint
         FROM stocks s
         JOIN products p ON s.product_id = p.id
         WHERE s.quantity <= p.min_stock 
         AND p.is_active = true
-      `
-    ]);
+      `,
+      ]);
 
     return {
       activeProducts,
       activeWarehouses,
       todayMovements,
-      lowStockCount: Number(lowStockResult[0]?.count || 0)
+      lowStockCount: Number(lowStockResult[0]?.count || 0),
     };
   }
 
@@ -38,8 +41,8 @@ export class DashboardService {
       include: {
         product: { select: { sku: true, name: true } },
         warehouse: { select: { name: true } },
-        createdBy: { select: { name: true } }
-      }
+        createdBy: { select: { name: true } },
+      },
     });
   }
 

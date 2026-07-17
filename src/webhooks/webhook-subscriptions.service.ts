@@ -16,7 +16,7 @@ export class WebhookSubscriptionsService {
   async create(createWebhookDto: CreateWebhookDto, userId: string) {
     // Generar un secret aleatorio de 32 bytes (64 caracteres hex)
     const rawSecret = crypto.randomBytes(32).toString('hex');
-    
+
     // Encriptar el secret
     const encryptedSecret = this.encryptionService.encrypt(rawSecret);
 
@@ -33,7 +33,7 @@ export class WebhookSubscriptionsService {
         events: true,
         isActive: true,
         createdAt: true,
-      }
+      },
     });
 
     // Retornamos el secret en texto plano por única vez
@@ -75,7 +75,9 @@ export class WebhookSubscriptionsService {
     });
 
     if (!subscription) {
-      throw new NotFoundException(`Webhook subscription with ID \${id} not found`);
+      throw new NotFoundException(
+        `Webhook subscription with ID \${id} not found`,
+      );
     }
 
     return subscription;
@@ -117,11 +119,13 @@ export class WebhookSubscriptionsService {
   async testWebhook(id: string) {
     const subscription = await this.prisma.webhookSubscription.findUnique({
       where: { id },
-      select: { id: true, url: true, encryptedSecret: true }
+      select: { id: true, url: true, encryptedSecret: true },
     });
 
     if (!subscription) {
-      throw new NotFoundException(`Webhook subscription with ID \${id} not found`);
+      throw new NotFoundException(
+        `Webhook subscription with ID \${id} not found`,
+      );
     }
 
     return subscription;
@@ -135,7 +139,7 @@ export class WebhookSubscriptionsService {
     dateFrom?: string,
   ) {
     const take = 50;
-    
+
     const where: any = {
       subscriptionId: id,
     };
@@ -148,13 +152,11 @@ export class WebhookSubscriptionsService {
       skip: cursor ? 1 : 0,
       cursor: cursor ? { id: cursor } : undefined,
       where,
-      orderBy: [
-        { deliveredAt: 'desc' },
-        { id: 'desc' }
-      ]
+      orderBy: [{ deliveredAt: 'desc' }, { id: 'desc' }],
     });
 
-    const nextCursor = deliveries.length === take ? deliveries[take - 1].id : null;
+    const nextCursor =
+      deliveries.length === take ? deliveries[take - 1].id : null;
 
     return {
       data: deliveries,

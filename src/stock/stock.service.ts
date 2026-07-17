@@ -1,7 +1,14 @@
-import { Injectable, BadRequestException, InternalServerErrorException, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MovementType, Prisma } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
@@ -37,20 +44,40 @@ export class StockService {
       await this.validateBatch(dto.batchId, dto.productId);
     }
     if (dto.serialNumbers && dto.serialNumbers.length !== dto.quantity) {
-      throw new BadRequestException(`El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`);
+      throw new BadRequestException(
+        `El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`,
+      );
     }
 
-    const transactionId = uuidv4();
+    const transactionId = randomUUID();
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        const movementResult = await this.executeMovementLogic(tx, dto, userId, transactionId);
+        const movementResult = await this.executeMovementLogic(
+          tx,
+          dto,
+          userId,
+          transactionId,
+        );
 
         if (dto.serialNumbers && dto.serialNumbers.length > 0) {
           if (dto.type === MovementType.INBOUND) {
-            await this.serialNumbersService.registerInbound(tx, dto.serialNumbers, movementResult.movement.id, dto.productId, dto.warehouseId, dto.batchId);
+            await this.serialNumbersService.registerInbound(
+              tx,
+              dto.serialNumbers,
+              movementResult.movement.id,
+              dto.productId,
+              dto.warehouseId,
+              dto.batchId,
+            );
           } else if (dto.type === MovementType.OUTBOUND) {
-            await this.serialNumbersService.registerOutbound(tx, dto.serialNumbers, movementResult.movement.id, dto.warehouseId, dto.productId);
+            await this.serialNumbersService.registerOutbound(
+              tx,
+              dto.serialNumbers,
+              movementResult.movement.id,
+              dto.warehouseId,
+              dto.productId,
+            );
           }
         }
 
@@ -64,52 +91,77 @@ export class StockService {
           currentQuantity: result.stockAfter,
           minStock: result.minStock,
         });
-        this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`);
+        this.logger.debug(
+          `Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`,
+        );
       }
 
-      await this.webhookDispatcherService.dispatch(WebhookEventType.movement_created, {
-        movementId: result.movement.id,
-        type: result.movement.type,
-        quantity: result.movement.quantity,
-        productId: result.movement.productId,
-        warehouseId: result.movement.warehouseId,
-        batchId: result.movement.batchId,
-      });
+      await this.webhookDispatcherService.dispatch(
+        WebhookEventType.movement_created,
+        {
+          movementId: result.movement.id,
+          type: result.movement.type,
+          quantity: result.movement.quantity,
+          productId: result.movement.productId,
+          warehouseId: result.movement.warehouseId,
+          batchId: result.movement.batchId,
+        },
+      );
 
       return {
         movement: result.movement,
         stockAfter: result.stockAfter,
       };
     } catch (error: any) {
-      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
-      
-      const errorCode = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : 'UNKNOWN';
-      this.logger.error(`[StockService.createMovement] Transaction failed. Code: ${errorCode}`, error.stack);
-      
-      throw new InternalServerErrorException('Failed to process stock movement');
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      )
+        throw error;
+
+      const errorCode =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.code
+          : 'UNKNOWN';
+      this.logger.error(
+        `[StockService.createMovement] Transaction failed. Code: ${errorCode}`,
+        error.stack,
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to process stock movement',
+      );
     }
   }
 
   async createTransfer(dto: CreateTransferDto, userId: string) {
     if (dto.fromWarehouseId === dto.toWarehouseId) {
-      throw new BadRequestException('Source and destination warehouses must be different');
+      throw new BadRequestException(
+        'Source and destination warehouses must be different',
+      );
     }
 
     if (dto.batchId) {
       await this.validateBatch(dto.batchId, dto.productId);
     }
     if (dto.serialNumbers && dto.serialNumbers.length !== dto.quantity) {
-      throw new BadRequestException(`El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`);
+      throw new BadRequestException(
+        `El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`,
+      );
     }
 
-    const transactionId = uuidv4();
+    const transactionId = randomUUID();
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
         // Total Order of Locks para prevenir deadlocks.
         // Ordenamos los almacenes alfanuméricamente para asegurar que las
         // transacciones concurrentes siempre adquieran los bloqueos en el mismo orden.
-        const sortedWarehouses = [dto.fromWarehouseId, dto.toWarehouseId].sort();
+        const sortedWarehouses = [
+          dto.fromWarehouseId,
+          dto.toWarehouseId,
+        ].sort();
 
         // Aplicamos el pre-bloqueo pesimista determinístico sobre stocks.
         let originStockQuantity = 0;
@@ -121,14 +173,16 @@ export class StockService {
               AND warehouse_id = ${wId}::uuid 
             FOR UPDATE
           `;
-          
+
           if (wId === dto.fromWarehouseId && result.length > 0) {
             originStockQuantity = Number(result[0].quantity);
           }
         }
 
         if (originStockQuantity < dto.quantity) {
-          throw new BadRequestException('Insufficient stock in origin warehouse');
+          throw new BadRequestException(
+            'Insufficient stock in origin warehouse',
+          );
         }
 
         // Pre-bloqueo pesimista sobre batch_stocks en el mismo orden (si hay lote)
@@ -142,38 +196,50 @@ export class StockService {
                 AND warehouse_id = ${wId}::uuid 
               FOR UPDATE
             `;
-            
+
             if (wId === dto.fromWarehouseId && batchResult.length > 0) {
               originBatchQuantity = Number(batchResult[0].quantity);
             }
           }
           if (originBatchQuantity < dto.quantity) {
-            throw new BadRequestException('Insufficient batch stock in origin warehouse');
+            throw new BadRequestException(
+              'Insufficient batch stock in origin warehouse',
+            );
           }
         }
 
         // Una vez asegurados los locks jerárquicos, ejecutamos los movimientos de manera segura.
         // OUTBOUND from source
-        const originResult = await this.executeMovementLogic(tx, {
-          productId: dto.productId,
-          warehouseId: dto.fromWarehouseId,
-          type: MovementType.OUTBOUND,
-          quantity: dto.quantity,
-          reference: `TRANSFER-OUT-${dto.reference}`,
-          notes: dto.notes,
-          batchId: dto.batchId,
-        }, userId, transactionId);
+        const originResult = await this.executeMovementLogic(
+          tx,
+          {
+            productId: dto.productId,
+            warehouseId: dto.fromWarehouseId,
+            type: MovementType.OUTBOUND,
+            quantity: dto.quantity,
+            reference: `TRANSFER-OUT-${dto.reference}`,
+            notes: dto.notes,
+            batchId: dto.batchId,
+          },
+          userId,
+          transactionId,
+        );
 
         // INBOUND to destination
-        await this.executeMovementLogic(tx, {
-          productId: dto.productId,
-          warehouseId: dto.toWarehouseId,
-          type: MovementType.INBOUND,
-          quantity: dto.quantity,
-          reference: `TRANSFER-IN-${dto.reference}`,
-          notes: dto.notes,
-          batchId: dto.batchId,
-        }, userId, transactionId);
+        await this.executeMovementLogic(
+          tx,
+          {
+            productId: dto.productId,
+            warehouseId: dto.toWarehouseId,
+            type: MovementType.INBOUND,
+            quantity: dto.quantity,
+            reference: `TRANSFER-IN-${dto.reference}`,
+            notes: dto.notes,
+            batchId: dto.batchId,
+          },
+          userId,
+          transactionId,
+        );
 
         if (dto.serialNumbers && dto.serialNumbers.length > 0) {
           await this.serialNumbersService.transferSerials(
@@ -185,7 +251,12 @@ export class StockService {
           );
         }
 
-        return { transactionId, status: 'SUCCESS', minStockOrigin: originResult.minStock, stockAfterOrigin: originResult.stockAfter };
+        return {
+          transactionId,
+          status: 'SUCCESS',
+          minStockOrigin: originResult.minStock,
+          stockAfterOrigin: originResult.stockAfter,
+        };
       });
 
       // Fuera de la transacción encolamos la alerta para el depósito de origen
@@ -195,30 +266,48 @@ export class StockService {
         currentQuantity: result.stockAfterOrigin,
         minStock: result.minStockOrigin,
       });
-      this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.fromWarehouseId}`);
+      this.logger.debug(
+        `Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.fromWarehouseId}`,
+      );
 
       // Emitir eventos de movimiento creado para ambos almacenes (OUTBOUND e INBOUND)
-      // Como esto es asíncrono y los movimientos ya se crearon, debemos hacer 
-      // queries a Prisma para obtener el ID real, o simplemente no mandar IDs pero 
+      // Como esto es asíncrono y los movimientos ya se crearon, debemos hacer
+      // queries a Prisma para obtener el ID real, o simplemente no mandar IDs pero
       // mandamos la metadata de transferencia
-      await this.webhookDispatcherService.dispatch(WebhookEventType.movement_created, {
-        transactionId: result.transactionId,
-        type: 'TRANSFER',
-        quantity: dto.quantity,
-        productId: dto.productId,
-        fromWarehouseId: dto.fromWarehouseId,
-        toWarehouseId: dto.toWarehouseId,
-        batchId: dto.batchId,
-      });
+      await this.webhookDispatcherService.dispatch(
+        WebhookEventType.movement_created,
+        {
+          transactionId: result.transactionId,
+          type: 'TRANSFER',
+          quantity: dto.quantity,
+          productId: dto.productId,
+          fromWarehouseId: dto.fromWarehouseId,
+          toWarehouseId: dto.toWarehouseId,
+          batchId: dto.batchId,
+        },
+      );
 
       return { transactionId: result.transactionId, status: result.status };
     } catch (error: any) {
-      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
-      
-      const errorCode = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : 'UNKNOWN';
-      this.logger.error(`[StockService.createTransfer] Transaction failed. Code: ${errorCode}`, error.stack);
-      
-      throw new InternalServerErrorException('Failed to process stock transfer');
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      )
+        throw error;
+
+      const errorCode =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.code
+          : 'UNKNOWN';
+      this.logger.error(
+        `[StockService.createTransfer] Transaction failed. Code: ${errorCode}`,
+        error.stack,
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to process stock transfer',
+      );
     }
   }
 
@@ -227,9 +316,11 @@ export class StockService {
       await this.validateBatch(dto.batchId, dto.productId);
     }
     if (dto.serialNumbers && dto.serialNumbers.length !== dto.quantity) {
-      throw new BadRequestException(`El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`);
+      throw new BadRequestException(
+        `El número de series provistas (${dto.serialNumbers.length}) no coincide con la cantidad (${dto.quantity})`,
+      );
     }
-    const transactionId = uuidv4();
+    const transactionId = randomUUID();
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
@@ -265,24 +356,30 @@ export class StockService {
         // 2. Validación en memoria
         if (dto.operation === 'SUBTRACT') {
           if (currentQuantity - dto.quantity < 0) {
-            throw new BadRequestException('El ajuste resultaría en stock negativo');
+            throw new BadRequestException(
+              'El ajuste resultaría en stock negativo',
+            );
           }
           if (dto.batchId && currentBatchQuantity - dto.quantity < 0) {
-            throw new BadRequestException('El ajuste resultaría en stock negativo para el lote');
+            throw new BadRequestException(
+              'El ajuste resultaría en stock negativo para el lote',
+            );
           }
         }
 
-        const newQuantity = dto.operation === 'ADD' 
-          ? currentQuantity + dto.quantity 
-          : currentQuantity - dto.quantity;
-          
-        const newBatchQuantity = dto.operation === 'ADD'
-          ? currentBatchQuantity + dto.quantity
-          : currentBatchQuantity - dto.quantity;
+        const newQuantity =
+          dto.operation === 'ADD'
+            ? currentQuantity + dto.quantity
+            : currentQuantity - dto.quantity;
+
+        const newBatchQuantity =
+          dto.operation === 'ADD'
+            ? currentBatchQuantity + dto.quantity
+            : currentBatchQuantity - dto.quantity;
 
         // 3. Crear movimiento inmutable
         const notesWithPrefix = `[${dto.operation}] ${dto.notes}`;
-        
+
         const movement = await tx.stockMovement.create({
           data: {
             productId: dto.productId,
@@ -330,7 +427,7 @@ export class StockService {
             },
           });
         }
-        
+
         // 4.5 Materializar batch_stocks
         if (dto.batchId) {
           await tx.batchStock.upsert({
@@ -354,9 +451,22 @@ export class StockService {
         // 4.6 Materializar serials
         if (dto.serialNumbers && dto.serialNumbers.length > 0) {
           if (dto.operation === 'ADD') {
-            await this.serialNumbersService.registerInbound(tx, dto.serialNumbers, movement.id, dto.productId, dto.warehouseId, dto.batchId);
+            await this.serialNumbersService.registerInbound(
+              tx,
+              dto.serialNumbers,
+              movement.id,
+              dto.productId,
+              dto.warehouseId,
+              dto.batchId,
+            );
           } else if (dto.operation === 'SUBTRACT') {
-            await this.serialNumbersService.registerOutbound(tx, dto.serialNumbers, movement.id, dto.warehouseId, dto.productId);
+            await this.serialNumbersService.registerOutbound(
+              tx,
+              dto.serialNumbers,
+              movement.id,
+              dto.warehouseId,
+              dto.productId,
+            );
           }
         }
 
@@ -366,7 +476,11 @@ export class StockService {
           select: { minStock: true },
         });
 
-        return { movement, stockAfter: newQuantity, minStock: product ? Number(product.minStock) : 0 };
+        return {
+          movement,
+          stockAfter: newQuantity,
+          minStock: product ? Number(product.minStock) : 0,
+        };
       });
 
       if (dto.operation === 'SUBTRACT') {
@@ -376,32 +490,50 @@ export class StockService {
           currentQuantity: result.stockAfter,
           minStock: result.minStock,
         });
-        this.logger.debug(`Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`);
+        this.logger.debug(
+          `Enqueued check-low-stock for product ${dto.productId} in warehouse ${dto.warehouseId}`,
+        );
       }
 
-      await this.webhookDispatcherService.dispatch(WebhookEventType.movement_created, {
-        movementId: result.movement.id,
-        type: result.movement.type,
-        quantity: result.movement.quantity,
-        productId: result.movement.productId,
-        warehouseId: result.movement.warehouseId,
-        batchId: result.movement.batchId,
-      });
+      await this.webhookDispatcherService.dispatch(
+        WebhookEventType.movement_created,
+        {
+          movementId: result.movement.id,
+          type: result.movement.type,
+          quantity: result.movement.quantity,
+          productId: result.movement.productId,
+          warehouseId: result.movement.warehouseId,
+          batchId: result.movement.batchId,
+        },
+      );
 
       return { movement: result.movement, stockAfter: result.stockAfter };
     } catch (error: any) {
-      if (error instanceof BadRequestException || error instanceof ConflictException || error instanceof NotFoundException) throw error;
-      
-      const errorCode = error instanceof Prisma.PrismaClientKnownRequestError ? error.code : 'UNKNOWN';
-      this.logger.error(`[StockService.createAdjustment] Transaction failed. Code: ${errorCode}`, error.stack);
-      
-      throw new InternalServerErrorException('Failed to process stock adjustment');
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      )
+        throw error;
+
+      const errorCode =
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.code
+          : 'UNKNOWN';
+      this.logger.error(
+        `[StockService.createAdjustment] Transaction failed. Code: ${errorCode}`,
+        error.stack,
+      );
+
+      throw new InternalServerErrorException(
+        'Failed to process stock adjustment',
+      );
     }
   }
 
   async getMovements(filters: GetMovementsFiltersDto) {
     const limit = filters.limit || 50;
-    
+
     // Configurar fechas por defecto si no vienen
     let dateFrom = filters.dateFrom;
     let dateTo = filters.dateTo;
@@ -421,7 +553,9 @@ export class StockService {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays > 60) {
-      throw new BadRequestException('El rango de fechas no puede superar los 60 días para proteger el rendimiento del sistema');
+      throw new BadRequestException(
+        'El rango de fechas no puede superar los 60 días para proteger el rendimiento del sistema',
+      );
     }
 
     const where: Prisma.StockMovementWhereInput = {
@@ -441,15 +575,12 @@ export class StockService {
       take: limit + 1,
       skip: filters.cursor ? 1 : undefined,
       cursor: filters.cursor ? { id: filters.cursor } : undefined,
-      orderBy: [
-        { createdAt: 'desc' },
-        { id: 'desc' }
-      ],
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       include: {
         product: { select: { sku: true, name: true } },
         warehouse: { select: { name: true } },
-        createdBy: { select: { name: true, email: true } }
-      }
+        createdBy: { select: { name: true, email: true } },
+      },
     });
 
     const hasNextPage = data.length > limit;
@@ -463,8 +594,8 @@ export class StockService {
       data,
       meta: {
         nextCursor,
-        hasNextPage
-      }
+        hasNextPage,
+      },
     };
   }
 
@@ -489,7 +620,9 @@ export class StockService {
     }
 
     if (lowStock) {
-      const lowStockPairs = await this.prisma.$queryRaw<{product_id: string, warehouse_id: string}[]>`
+      const lowStockPairs = await this.prisma.$queryRaw<
+        { product_id: string; warehouse_id: string }[]
+      >`
         SELECT s.product_id, s.warehouse_id 
         FROM stocks s 
         JOIN products p ON s.product_id = p.id 
@@ -499,18 +632,18 @@ export class StockService {
       if (lowStockPairs.length === 0) {
         return {
           data: [],
-          meta: { 
-            total: 0, 
-            page: filters.page || 1, 
-            limit: filters.limit || 50, 
-            totalPages: 0 
-          }
+          meta: {
+            total: 0,
+            page: filters.page || 1,
+            limit: filters.limit || 50,
+            totalPages: 0,
+          },
         };
       }
 
-      where.OR = lowStockPairs.map(p => ({
+      where.OR = lowStockPairs.map((p) => ({
         productId: p.product_id,
-        warehouseId: p.warehouse_id
+        warehouseId: p.warehouse_id,
       }));
     }
 
@@ -619,9 +752,14 @@ export class StockService {
     return stock || { productId, warehouseId, quantity: 0 };
   }
 
-  async getStockByBatch(productId?: string, warehouseId?: string, batchId?: string, includeEmpty: boolean = false) {
+  async getStockByBatch(
+    productId?: string,
+    warehouseId?: string,
+    batchId?: string,
+    includeEmpty: boolean = false,
+  ) {
     const where: Prisma.BatchStockWhereInput = {};
-    
+
     if (productId) where.batch = { productId };
     if (warehouseId) where.warehouseId = warehouseId;
     if (batchId) where.batchId = batchId;
@@ -631,9 +769,9 @@ export class StockService {
       where,
       include: {
         batch: true,
-        warehouse: { select: { id: true, name: true } }
+        warehouse: { select: { id: true, name: true } },
       },
-      orderBy: { batch: { expiryDate: { sort: 'asc', nulls: 'last' } } }
+      orderBy: { batch: { expiryDate: { sort: 'asc', nulls: 'last' } } },
     });
   }
 
@@ -645,16 +783,18 @@ export class StockService {
       throw new NotFoundException(`Batch ${batchId} not found`);
     }
     if (batch.productId !== productId) {
-      throw new BadRequestException(`Batch ${batchId} does not belong to product ${productId}`);
+      throw new BadRequestException(
+        `Batch ${batchId} does not belong to product ${productId}`,
+      );
     }
     return batch;
   }
 
   private async executeMovementLogic(
-    tx: Prisma.TransactionClient, 
-    dto: CreateMovementDto, 
-    userId: string, 
-    transactionId: string
+    tx: Prisma.TransactionClient,
+    dto: CreateMovementDto,
+    userId: string,
+    transactionId: string,
   ) {
     if (dto.quantity <= 0) {
       throw new BadRequestException('Quantity must be strictly positive');
@@ -699,15 +839,21 @@ export class StockService {
       newQuantity -= dto.quantity;
       if (dto.batchId) newBatchQuantity -= dto.quantity;
     } else if (dto.type === MovementType.ADJUSTMENT) {
-      throw new BadRequestException('Use explicit INBOUND/OUTBOUND for adjustments in this context');
+      throw new BadRequestException(
+        'Use explicit INBOUND/OUTBOUND for adjustments in this context',
+      );
     }
 
     // 3. Validar atomicidad
     if (newQuantity < 0) {
-      throw new BadRequestException(`Insufficient stock. Current: ${currentQuantity}, Requested: ${dto.quantity}`);
+      throw new BadRequestException(
+        `Insufficient stock. Current: ${currentQuantity}, Requested: ${dto.quantity}`,
+      );
     }
     if (dto.batchId && newBatchQuantity < 0) {
-      throw new BadRequestException(`Insufficient batch stock. Current: ${currentBatchQuantity}, Requested: ${dto.quantity}`);
+      throw new BadRequestException(
+        `Insufficient batch stock. Current: ${currentBatchQuantity}, Requested: ${dto.quantity}`,
+      );
     }
 
     // 4. Insertar en el ledger inmutable (StockMovement)
@@ -769,11 +915,11 @@ export class StockService {
       select: { minStock: true },
     });
 
-    return { 
-      movement, 
-      stockAfter: newQuantity, 
+    return {
+      movement,
+      stockAfter: newQuantity,
       minStock: product ? Number(product.minStock) : 0,
-      batchStockAfter: dto.batchId ? newBatchQuantity : undefined 
+      batchStockAfter: dto.batchId ? newBatchQuantity : undefined,
     };
   }
 
@@ -790,7 +936,9 @@ export class StockService {
     });
 
     if (!movement) {
-      throw new NotFoundException(`Stock movement with ID ${movementId} not found`);
+      throw new NotFoundException(
+        `Stock movement with ID ${movementId} not found`,
+      );
     }
 
     return movement.batch;

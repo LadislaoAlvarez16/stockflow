@@ -1,12 +1,25 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Get,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuthService, LoginResponse } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { Public } from '../common/decorators/public.decorator';
-import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  JwtPayload,
+} from '../common/decorators/current-user.decorator';
 import { User } from '@prisma/client';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(

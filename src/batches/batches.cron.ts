@@ -16,21 +16,26 @@ export class BatchesCronService {
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async checkExpiringBatches() {
     this.logger.log('Ejecutando cron checkExpiringBatches...');
-    
+
     // Buscar lotes que expiran en los proximos 30 dias
     const expiringBatches = await this.batchesService.getExpiringBatches(30);
 
     for (const data of expiringBatches) {
-      await this.webhookDispatcherService.dispatch(WebhookEventType.batch_expiring, {
-        batchId: data.batch.id,
-        batchNumber: data.batch.batchNumber,
-        productId: data.batch.product.id,
-        expiryDate: data.batch.expiryDate,
-        totalQuantity: data.totalQuantity,
-        locations: data.locations,
-      });
+      await this.webhookDispatcherService.dispatch(
+        WebhookEventType.batch_expiring,
+        {
+          batchId: data.batch.id,
+          batchNumber: data.batch.batchNumber,
+          productId: data.batch.product.id,
+          expiryDate: data.batch.expiryDate,
+          totalQuantity: data.totalQuantity,
+          locations: data.locations,
+        },
+      );
     }
 
-    this.logger.log(`checkExpiringBatches finalizado. Se detectaron \${expiringBatches.length} lotes por vencer.`);
+    this.logger.log(
+      `checkExpiringBatches finalizado. Se detectaron \${expiringBatches.length} lotes por vencer.`,
+    );
   }
 }

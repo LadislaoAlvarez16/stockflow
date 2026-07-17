@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { StockService } from '../stock/stock.service';
 import { CreateAdjustmentDto } from '../stock/dto/create-adjustment.dto';
@@ -8,7 +13,9 @@ import { PhysicalInventoryStatus, Prisma } from '@prisma/client';
 
 const InventoryRowSchema = z.object({
   sku: z.string().min(1, 'SKU is required'),
-  counted_quantity: z.coerce.number().nonnegative('Quantity must be non-negative'),
+  counted_quantity: z.coerce
+    .number()
+    .nonnegative('Quantity must be non-negative'),
   batch_number: z.coerce.string().optional().nullable(),
   notes: z.coerce.string().optional().nullable(),
 });
@@ -28,12 +35,18 @@ export class PhysicalInventoryService {
     private readonly webhookDispatcherService: WebhookDispatcherService,
   ) {}
 
-  async processUpload(file: Express.Multer.File, warehouseId: string, userId: string) {
+  async processUpload(
+    file: Express.Multer.File,
+    warehouseId: string,
+    userId: string,
+  ) {
     if (!file) throw new BadRequestException('File is required');
     if (!warehouseId) throw new BadRequestException('warehouseId is required');
 
     // Validar depósito
-    const warehouse = await this.prisma.warehouse.findUnique({ where: { id: warehouseId } });
+    const warehouse = await this.prisma.warehouse.findUnique({
+      where: { id: warehouseId },
+    });
     if (!warehouse) throw new NotFoundException('Warehouse not found');
 
     // 1. Crear sesión de inventario en procesamiento
@@ -49,7 +62,8 @@ export class PhysicalInventoryService {
     let adjustedItems = 0;
     let skippedItems = 0;
     const errorLog: any[] = [];
-    const adjustmentsToProcess: { dto: CreateAdjustmentDto; rowNum: number }[] = [];
+    const adjustmentsToProcess: { dto: CreateAdjustmentDto; rowNum: number }[] =
+      [];
 
     try {
       // 2. Parsear el archivo con SheetJS
@@ -85,7 +99,7 @@ export class PhysicalInventoryService {
       });
 
       // Map para búsqueda rápida O(1)
-      const productMap = new Map<string, typeof productsData[0]>();
+      const productMap = new Map<string, (typeof productsData)[0]>();
       for (const p of productsData) {
         productMap.set(p.sku.toUpperCase(), p);
       }
@@ -97,8 +111,13 @@ export class PhysicalInventoryService {
 
         const parsed = InventoryRowSchema.safeParse(row);
         if (!parsed.success) {
-          const errors = parsed.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ');
-          errorLog.push({ row: rowNum, error: `Invalid data format: ${errors}` });
+          const errors = parsed.error.issues
+            .map((e: any) => `${e.path.join('.')}: ${e.message}`)
+            .join(', ');
+          errorLog.push({
+            row: rowNum,
+            error: `Invalid data format: ${errors}`,
+          });
           continue;
         }
 
@@ -108,13 +127,20 @@ export class PhysicalInventoryService {
 
         if (!product) {
           skippedItems++;
-          errorLog.push({ row: rowNum, error: `SKU no encontrado o inactivo: ${data.sku}` });
+          errorLog.push({
+            row: rowNum,
+            error: `SKU no encontrado o inactivo: ${data.sku}`,
+          });
           continue;
         }
 
         if (product.hasSerialNumbers) {
           skippedItems++;
-          errorLog.push({ row: rowNum, error: 'Producto serializado: el ajuste debe realizarse de forma manual' });
+          errorLog.push({
+            row: rowNum,
+            error:
+              'Producto serializado: el ajuste debe realizarse de forma manual',
+          });
           continue;
         }
 
@@ -123,10 +149,15 @@ export class PhysicalInventoryService {
         let batchId: string | undefined = undefined;
 
         if (data.batch_number) {
-          const batch = product.batches.find(b => b.batchNumber === data.batch_number);
+          const batch = product.batches.find(
+            (b) => b.batchNumber === data.batch_number,
+          );
           if (!batch) {
             skippedItems++;
-            errorLog.push({ row: rowNum, error: `Lote ${data.batch_number} no encontrado para SKU ${data.sku}` });
+            errorLog.push({
+              row: rowNum,
+              error: `Lote ${data.batch_number} no encontrado para SKU ${data.sku}`,
+            });
             continue;
           }
           batchId = batch.id;
@@ -154,7 +185,8 @@ export class PhysicalInventoryService {
               warehouseId,
               quantity: qtyToAdjust,
               operation,
-              notes: data.notes || `Ajuste por inventario físico. Fila ${rowNum}`,
+              notes:
+                data.notes || `Ajuste por inventario físico. Fila ${rowNum}`,
               batchId,
               physicalInventorySessionId: session.id,
             },
@@ -166,66 +198,81 @@ export class PhysicalInventoryService {
       const CHUNK_SIZE = 50;
       for (let i = 0; i < adjustmentsToProcess.length; i += CHUNK_SIZE) {
         const chunk = adjustmentsToProcess.slice(i, i + CHUNK_SIZE);
-        
+
         for (const item of chunk) {
           try {
             await this.stockService.createAdjustment(item.dto, userId);
             adjustedItems++;
           } catch (error: any) {
-            errorLog.push({ row: item.rowNum, error: `Falló al generar ajuste: ${error.message}` });
+            errorLog.push({
+              row: item.rowNum,
+              error: `Falló al generar ajuste: ${error.message}`,
+            });
           }
         }
       }
 
       // 6. Actualizar el estado final de la sesión
-      let finalStatus: PhysicalInventoryStatus = PhysicalInventoryStatus.completed;
+      let finalStatus: PhysicalInventoryStatus =
+        PhysicalInventoryStatus.completed;
       if (errorLog.length > 0) {
-        finalStatus = adjustedItems === 0 && matchedItems === 0 
-          ? PhysicalInventoryStatus.failed 
-          : PhysicalInventoryStatus.completed_with_errors;
+        finalStatus =
+          adjustedItems === 0 && matchedItems === 0
+            ? PhysicalInventoryStatus.failed
+            : PhysicalInventoryStatus.completed_with_errors;
       } else if (adjustedItems > 0) {
         finalStatus = PhysicalInventoryStatus.completed_with_differences;
       }
 
-      const completedSession = await this.prisma.physicalInventorySession.update({
-        where: { id: session.id },
-        data: {
-          status: finalStatus,
+      const completedSession =
+        await this.prisma.physicalInventorySession.update({
+          where: { id: session.id },
+          data: {
+            status: finalStatus,
+            matchedItems,
+            adjustedItems,
+            skippedItems,
+            errorLog: errorLog.length > 0 ? errorLog : Prisma.DbNull,
+          },
+        });
+
+      // Emitir webhook post-transacción/post-actualización
+      await this.webhookDispatcherService.dispatch(
+        WebhookEventType.inventory_reconciled,
+        {
+          sessionId: completedSession.id,
+          warehouseId,
+          status: completedSession.status,
           matchedItems,
           adjustedItems,
           skippedItems,
-          errorLog: errorLog.length > 0 ? errorLog : Prisma.DbNull,
+          errors: errorLog.length,
         },
-      });
-
-      // Emitir webhook post-transacción/post-actualización
-      await this.webhookDispatcherService.dispatch(WebhookEventType.inventory_reconciled, {
-        sessionId: completedSession.id,
-        warehouseId,
-        status: completedSession.status,
-        matchedItems,
-        adjustedItems,
-        skippedItems,
-        errors: errorLog.length,
-      });
+      );
 
       return {
         message: 'Inventario físico procesado exitosamente',
         session: completedSession,
       };
-
     } catch (err: any) {
-      this.logger.error(`Error procesando inventario físico: ${err.message}`, err.stack);
-      
+      this.logger.error(
+        `Error procesando inventario físico: ${err.message}`,
+        err.stack,
+      );
+
       await this.prisma.physicalInventorySession.update({
         where: { id: session.id },
         data: {
           status: PhysicalInventoryStatus.failed,
-          errorLog: [{ row: 0, error: 'Error catastrófico procesando el archivo' }],
+          errorLog: [
+            { row: 0, error: 'Error catastrófico procesando el archivo' },
+          ],
         },
       });
 
-      throw new BadRequestException(`No se pudo procesar el archivo: ${err.message}`);
+      throw new BadRequestException(
+        `No se pudo procesar el archivo: ${err.message}`,
+      );
     }
   }
 

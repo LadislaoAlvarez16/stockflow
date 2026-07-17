@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Query, Request, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  Request,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { BatchesService } from './batches.service';
 import { CreateBatchDto } from './dto/create-batch.dto';
 import { GetBatchesFiltersDto } from './dto/get-batches-filters.dto';
@@ -24,7 +34,8 @@ export class BatchesController {
   @Get('expiring-soon')
   @Roles(UserRole.ADMIN, UserRole.OPERATOR, UserRole.VIEWER)
   getExpiringBatches(
-    @Query('daysThreshold', new DefaultValuePipe(30), ParseIntPipe) daysThreshold: number,
+    @Query('daysThreshold', new DefaultValuePipe(30), ParseIntPipe)
+    daysThreshold: number,
   ) {
     return this.batchesService.getExpiringBatches(daysThreshold);
   }

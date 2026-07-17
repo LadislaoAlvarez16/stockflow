@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -34,7 +39,9 @@ export class SerialNumbersService {
     } catch (error: any) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-          throw new ConflictException('One or more serial numbers already exist for this product');
+          throw new ConflictException(
+            'One or more serial numbers already exist for this product',
+          );
         }
       }
       throw error;
@@ -58,17 +65,27 @@ export class SerialNumbersService {
     if (existingSerials.length !== serials.length) {
       const foundSet = new Set(existingSerials.map((s) => s.serialNumber));
       const missing = serials.filter((s) => !foundSet.has(s));
-      throw new BadRequestException(`Serial numbers not found: ${missing.join(', ')}`);
+      throw new BadRequestException(
+        `Serial numbers not found: ${missing.join(', ')}`,
+      );
     }
 
-    const invalidStatuses = existingSerials.filter((s) => s.status !== 'available');
+    const invalidStatuses = existingSerials.filter(
+      (s) => s.status !== 'available',
+    );
     if (invalidStatuses.length > 0) {
-      throw new BadRequestException(`Serial numbers are not available: ${invalidStatuses.map((s) => s.serialNumber).join(', ')}`);
+      throw new BadRequestException(
+        `Serial numbers are not available: ${invalidStatuses.map((s) => s.serialNumber).join(', ')}`,
+      );
     }
 
-    const invalidWarehouses = existingSerials.filter((s) => s.warehouseId !== warehouseId);
+    const invalidWarehouses = existingSerials.filter(
+      (s) => s.warehouseId !== warehouseId,
+    );
     if (invalidWarehouses.length > 0) {
-      throw new BadRequestException(`Serial numbers are not in warehouse ${warehouseId}: ${invalidWarehouses.map((s) => s.serialNumber).join(', ')}`);
+      throw new BadRequestException(
+        `Serial numbers are not in warehouse ${warehouseId}: ${invalidWarehouses.map((s) => s.serialNumber).join(', ')}`,
+      );
     }
 
     await tx.serialNumber.updateMany({
@@ -101,17 +118,27 @@ export class SerialNumbersService {
     if (existingSerials.length !== serials.length) {
       const foundSet = new Set(existingSerials.map((s) => s.serialNumber));
       const missing = serials.filter((s) => !foundSet.has(s));
-      throw new BadRequestException(`Serial numbers not found: ${missing.join(', ')}`);
+      throw new BadRequestException(
+        `Serial numbers not found: ${missing.join(', ')}`,
+      );
     }
 
-    const invalidStatuses = existingSerials.filter((s) => s.status !== 'available');
+    const invalidStatuses = existingSerials.filter(
+      (s) => s.status !== 'available',
+    );
     if (invalidStatuses.length > 0) {
-      throw new BadRequestException(`Serial numbers are not available: ${invalidStatuses.map((s) => s.serialNumber).join(', ')}`);
+      throw new BadRequestException(
+        `Serial numbers are not available: ${invalidStatuses.map((s) => s.serialNumber).join(', ')}`,
+      );
     }
 
-    const invalidWarehouses = existingSerials.filter((s) => s.warehouseId !== fromWarehouseId);
+    const invalidWarehouses = existingSerials.filter(
+      (s) => s.warehouseId !== fromWarehouseId,
+    );
     if (invalidWarehouses.length > 0) {
-      throw new BadRequestException(`Serial numbers are not in origin warehouse ${fromWarehouseId}: ${invalidWarehouses.map((s) => s.serialNumber).join(', ')}`);
+      throw new BadRequestException(
+        `Serial numbers are not in origin warehouse ${fromWarehouseId}: ${invalidWarehouses.map((s) => s.serialNumber).join(', ')}`,
+      );
     }
 
     await tx.serialNumber.updateMany({

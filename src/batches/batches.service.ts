@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateBatchDto } from './dto/create-batch.dto';
 import { GetBatchesFiltersDto } from './dto/get-batches-filters.dto';
@@ -11,7 +16,9 @@ export class BatchesService {
   async create(dto: CreateBatchDto, userId: string) {
     if (dto.manufacturingDate && dto.expiryDate) {
       if (new Date(dto.manufacturingDate) >= new Date(dto.expiryDate)) {
-        throw new BadRequestException('Manufacturing date must be before expiry date');
+        throw new BadRequestException(
+          'Manufacturing date must be before expiry date',
+        );
       }
     }
 
@@ -22,7 +29,9 @@ export class BatchesService {
           productId: dto.productId,
           supplierId: dto.supplierId,
           expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
-          manufacturingDate: dto.manufacturingDate ? new Date(dto.manufacturingDate) : null,
+          manufacturingDate: dto.manufacturingDate
+            ? new Date(dto.manufacturingDate)
+            : null,
           initialQuantity: dto.initialQuantity,
           notes: dto.notes,
           createdById: userId,
@@ -32,7 +41,9 @@ export class BatchesService {
     } catch (error: any) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
-          throw new ConflictException('Batch number already exists for this product');
+          throw new ConflictException(
+            'Batch number already exists for this product',
+          );
         }
       }
       throw error;
@@ -71,7 +82,10 @@ export class BatchesService {
     });
 
     const result = batches.map((batch) => {
-      const totalStock = batch.batchStocks.reduce((sum, stock) => sum + Number(stock.quantity), 0);
+      const totalStock = batch.batchStocks.reduce(
+        (sum, stock) => sum + Number(stock.quantity),
+        0,
+      );
       return {
         ...batch,
         totalStock,
@@ -103,7 +117,10 @@ export class BatchesService {
       throw new NotFoundException('Batch not found');
     }
 
-    const totalStock = batch.batchStocks.reduce((sum, stock) => sum + Number(stock.quantity), 0);
+    const totalStock = batch.batchStocks.reduce(
+      (sum, stock) => sum + Number(stock.quantity),
+      0,
+    );
     return {
       ...batch,
       totalStock,
@@ -128,7 +145,10 @@ export class BatchesService {
     });
 
     return batches.map((batch) => {
-      const totalStock = batch.batchStocks.reduce((sum, stock) => sum + Number(stock.quantity), 0);
+      const totalStock = batch.batchStocks.reduce(
+        (sum, stock) => sum + Number(stock.quantity),
+        0,
+      );
       return {
         ...batch,
         totalStock,
@@ -136,19 +156,23 @@ export class BatchesService {
     });
   }
 
-  async suggestBatchForOutbound(productId: string, warehouseId: string, quantity: number) {
+  async suggestBatchForOutbound(
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+  ) {
     const batchStock = await this.prisma.batchStock.findFirst({
       where: {
         warehouseId,
         quantity: { gte: quantity },
-        batch: { productId }
+        batch: { productId },
       },
       orderBy: {
-        batch: { expiryDate: { sort: 'asc', nulls: 'last' } }
+        batch: { expiryDate: { sort: 'asc', nulls: 'last' } },
       },
       include: {
-        batch: true
-      }
+        batch: true,
+      },
     });
 
     if (!batchStock) {
@@ -226,10 +250,15 @@ export class BatchesService {
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async getSerialNumbers(batchId: string, page: number = 1, limit: number = 100, status?: any) {
+  async getSerialNumbers(
+    batchId: string,
+    page: number = 1,
+    limit: number = 100,
+    status?: any,
+  ) {
     const skip = (page - 1) * limit;
     const where: any = { batchId };
-    
+
     if (status) {
       where.status = status;
     }
