@@ -4,6 +4,7 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma.service';
 import { WebhookEventType } from '@prisma/client';
 import { WebhookJobPayload } from './interfaces/webhook-job.interface';
+import { WebhookPayloadMap } from './interfaces/webhook-payloads.interface';
 
 @Injectable()
 export class WebhookDispatcherService {
@@ -14,7 +15,10 @@ export class WebhookDispatcherService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async dispatch(event: WebhookEventType, payload: any) {
+  async dispatch<E extends WebhookEventType>(
+    event: E,
+    payload: WebhookPayloadMap[E],
+  ): Promise<void> {
     try {
       // Buscar suscripciones activas para este evento
       const subscriptions = await this.prisma.webhookSubscription.findMany({
@@ -31,7 +35,7 @@ export class WebhookDispatcherService {
       }
 
       const jobs = subscriptions.map((sub) => {
-        const jobData: WebhookJobPayload = {
+        const jobData: WebhookJobPayload<E> = {
           subscriptionId: sub.id,
           url: sub.url,
           encryptedSecret: sub.encryptedSecret,
@@ -55,10 +59,10 @@ export class WebhookDispatcherService {
       await this.webhooksQueue.addBulk(jobs);
 
       this.logger.log(
-        `Encolados \${jobs.length} webhooks para el evento \${event}`,
+        `Encolados ${jobs.length} webhooks para el evento ${event}`,
       );
     } catch (error) {
-      this.logger.error(`Error despachando webhooks para \${event}:`, error);
+      this.logger.error(`Error despachando webhooks para ${event}:`, error);
       // Falla silenciosa permitida aquí porque los webhooks son post-transacción
       // y no deben interrumpir el flujo principal (BR-21).
     }
@@ -69,16 +73,20 @@ export class WebhookDispatcherService {
     url: string,
     encryptedSecret: string,
   ) {
-    const jobData: WebhookJobPayload = {
+    const dummyPayload: WebhookPayloadMap['movement_created'] = {
+      movementId: 'test-movement-id',
+      type: 'INBOUND',
+      quantity: 1,
+      productId: 'test-product-id',
+      warehouseId: 'test-warehouse-id',
+    };
+
+    const jobData: WebhookJobPayload<'movement_created'> = {
       subscriptionId,
       url,
       encryptedSecret,
       event: WebhookEventType.movement_created,
-      payload: {
-        test: true,
-        message: 'This is a test webhook from StockFlow',
-        timestamp: new Date().toISOString(),
-      },
+      payload: dummyPayload,
     };
 
     await this.webhooksQueue.add('test_event', jobData, {
@@ -89,7 +97,7 @@ export class WebhookDispatcherService {
     });
 
     this.logger.log(
-      `Encolado webhook de prueba para la suscripcion \${subscriptionId}`,
+      `Encolado webhook de prueba para la suscripcion ${subscriptionId}`,
     );
   }
 }

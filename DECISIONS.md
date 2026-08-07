@@ -95,3 +95,15 @@
 1. **Despacho estrictamente Post-Transaccional (BR-21):** El `WebhookDispatcherService.dispatch` nunca se invoca dentro de un `prisma.$transaction()`. Si el webhook falla, el motor transaccional del ERP ya consolidó los datos de manera consistente.
 2. **Workers en BullMQ con Backoff:** El retry y control de latencias (Axios) se delega completamente a un worker asíncrono. Los errores HTTP fuerzan un `throw` luego del log para que BullMQ gestione el backoff exponencial.
 3. **Paginación obligatoria por Cursor (Keyset Pagination):** Dado que la tabla `webhook_deliveries` es un historial inmutable de alto crecimiento, se prohíbe `skip/take` tradicional por offset. El endpoint `GET /webhooks/:id/deliveries` requiere obligatoriamente paginación por cursor (`id`) para prevenir OOM y degradación en el DB Engine.
+
+## 019 - Type Safety Estricto en Capa de Webhooks (Generics)
+**Fecha:** 2026-08-07
+**Contexto:** Los payloads enviados a la cola de BullMQ y el servicio despachador dependían del tipo `any`, violando la configuración estricta (`strict: true`) de TypeScript y abriendo la puerta a errores de serialización o mutaciones accidentales. 
+
+**Decisiones:**
+1. **Generic Payload Mapping (`WebhookPayloadMap`):**
+   - Se diseñó un mapa acoplado 1-to-1 al enum `WebhookEventType` del Prisma Schema. Cada evento de negocio fuerza un contrato inquebrantable para su payload. La inserción a Redis a través de la interfaz `WebhookJobPayload<E>` asegura que los tipos sobrevivan al cruce de barrera asíncrona.
+2. **Rechazo de Payloads Ad-Hoc:**
+   - Previamente, el evento genérico interno de transferencia (`TRANSFER`) en memoria utilizaba campos no documentados y despachaba un `movement_created`. La resolución arquitectónica prohíbe payloads flexibles: el `StockService` fue refactorizado para emitir dos eventos estándar de `movement_created` (`OUTBOUND` e `INBOUND`) con los IDs reales extraídos del motor, garantizando la predictibilidad de la respuesta.
+3. **Erradicación Total de `any`:**
+   - Cualquier dependencia de variables comodín en el worker, dispatcher o consultas de Prisma en esta capa fue formalmente erradicada.

@@ -15,7 +15,7 @@ import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole, WebhookEventType } from '@prisma/client';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
 
 @Controller('webhooks')
 @Roles(UserRole.ADMIN)

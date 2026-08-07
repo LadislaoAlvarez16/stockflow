@@ -1,9 +1,10 @@
 import { WebhookEventType } from '@prisma/client';
+import { WebhookPayloadMap } from './webhook-payloads.interface';
 
-export interface WebhookJobPayload {
+export interface WebhookJobPayload<E extends WebhookEventType = WebhookEventType> {
   subscriptionId: string;
   url: string;
   encryptedSecret: string;
-  event: WebhookEventType;
-  payload: any;
+  event: E;
+  payload: WebhookPayloadMap[E];
 }

@@ -3,7 +3,7 @@ import { PrismaService } from '../common/prisma.service';
 import { WebhookEncryptionService } from './webhook-encryption.service';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
-import { WebhookEventType } from '@prisma/client';
+import { WebhookEventType, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -76,7 +76,7 @@ export class WebhookSubscriptionsService {
 
     if (!subscription) {
       throw new NotFoundException(
-        `Webhook subscription with ID \${id} not found`,
+        `Webhook subscription with ID ${id} not found`,
       );
     }
 
@@ -140,7 +140,7 @@ export class WebhookSubscriptionsService {
   ) {
     const take = 50;
 
-    const where: any = {
+    const where: Prisma.WebhookDeliveryWhereInput = {
       subscriptionId: id,
     };
     if (event) where.event = event;

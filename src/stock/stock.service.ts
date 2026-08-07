@@ -101,7 +101,7 @@ export class StockService {
         {
           movementId: result.movement.id,
           type: result.movement.type,
-          quantity: result.movement.quantity,
+          quantity: Number(result.movement.quantity),
           productId: result.movement.productId,
           warehouseId: result.movement.warehouseId,
           batchId: result.movement.batchId,
@@ -209,7 +209,6 @@ export class StockService {
         }
 
         // Una vez asegurados los locks jerárquicos, ejecutamos los movimientos de manera segura.
-        // OUTBOUND from source
         const originResult = await this.executeMovementLogic(
           tx,
           {
@@ -226,7 +225,7 @@ export class StockService {
         );
 
         // INBOUND to destination
-        await this.executeMovementLogic(
+        const destinationResult = await this.executeMovementLogic(
           tx,
           {
             productId: dto.productId,
@@ -256,6 +255,8 @@ export class StockService {
           status: 'SUCCESS',
           minStockOrigin: originResult.minStock,
           stockAfterOrigin: originResult.stockAfter,
+          originMovement: originResult.movement,
+          destinationMovement: destinationResult.movement,
         };
       });
 
@@ -271,19 +272,27 @@ export class StockService {
       );
 
       // Emitir eventos de movimiento creado para ambos almacenes (OUTBOUND e INBOUND)
-      // Como esto es asíncrono y los movimientos ya se crearon, debemos hacer
-      // queries a Prisma para obtener el ID real, o simplemente no mandar IDs pero
-      // mandamos la metadata de transferencia
       await this.webhookDispatcherService.dispatch(
         WebhookEventType.movement_created,
         {
-          transactionId: result.transactionId,
-          type: 'TRANSFER',
-          quantity: dto.quantity,
-          productId: dto.productId,
-          fromWarehouseId: dto.fromWarehouseId,
-          toWarehouseId: dto.toWarehouseId,
-          batchId: dto.batchId,
+          movementId: result.originMovement.id,
+          type: result.originMovement.type,
+          quantity: Number(result.originMovement.quantity),
+          productId: result.originMovement.productId,
+          warehouseId: result.originMovement.warehouseId,
+          batchId: result.originMovement.batchId,
+        },
+      );
+
+      await this.webhookDispatcherService.dispatch(
+        WebhookEventType.movement_created,
+        {
+          movementId: result.destinationMovement.id,
+          type: result.destinationMovement.type,
+          quantity: Number(result.destinationMovement.quantity),
+          productId: result.destinationMovement.productId,
+          warehouseId: result.destinationMovement.warehouseId,
+          batchId: result.destinationMovement.batchId,
         },
       );
 
@@ -500,7 +509,7 @@ export class StockService {
         {
           movementId: result.movement.id,
           type: result.movement.type,
-          quantity: result.movement.quantity,
+          quantity: Number(result.movement.quantity),
           productId: result.movement.productId,
           warehouseId: result.movement.warehouseId,
           batchId: result.movement.batchId,

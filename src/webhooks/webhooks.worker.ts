@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { WebhookJobPayload } from './interfaces/webhook-job.interface';
 import { WebhookEncryptionService } from './webhook-encryption.service';
 import { PrismaService } from '../common/prisma.service';
+import { WebhookEventType } from '@prisma/client';
 import axios from 'axios';
 import * as crypto from 'crypto';
 
@@ -95,7 +96,7 @@ export class WebhooksWorker extends WorkerHost {
 
   private async logDelivery(data: {
     subscriptionId: string;
-    event: any;
+    event: WebhookEventType;
     statusCode: number | null;
     responseBody: string | null;
     duration: number;
