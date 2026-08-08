@@ -32,7 +32,7 @@ export class CreateAdjustmentDto {
   quantity: number;
 
   @IsIn(['ADD', 'SUBTRACT'])
-  operation: 'ADD' | 'SUBTRACT';
+  direction: 'ADD' | 'SUBTRACT';
 
   @IsString()
   @IsNotEmpty()

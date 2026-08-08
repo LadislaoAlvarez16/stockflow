@@ -128,6 +128,7 @@ model StockMovement {
   quantity           Decimal      @db.Decimal(10, 2)
   reference          String
   notes              String?
+  adjustmentDirection String?      @map("adjustment_direction")
   transactionId      String?      @map("transaction_id") @db.Uuid
   createdById        String       @map("created_by_id") @db.Uuid
   correctsMovementId String?      @map("corrects_movement_id") @db.Uuid

@@ -175,7 +175,7 @@ export class PhysicalInventoryService {
         if (difference === 0) {
           matchedItems++;
         } else {
-          const operation = difference > 0 ? 'ADD' : 'SUBTRACT';
+          const direction = difference > 0 ? 'ADD' : ('SUBTRACT' as 'ADD' | 'SUBTRACT');
           const qtyToAdjust = Math.abs(difference);
 
           adjustmentsToProcess.push({
@@ -184,7 +184,7 @@ export class PhysicalInventoryService {
               productId: product.id,
               warehouseId,
               quantity: qtyToAdjust,
-              operation,
+              direction,
               notes:
                 data.notes || `Ajuste por inventario físico. Fila ${rowNum}`,
               batchId,

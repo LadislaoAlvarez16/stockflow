@@ -363,7 +363,7 @@ export class StockService {
         }
 
         // 2. Validación en memoria
-        if (dto.operation === 'SUBTRACT') {
+        if (dto.direction === 'SUBTRACT') {
           if (currentQuantity - dto.quantity < 0) {
             throw new BadRequestException(
               'El ajuste resultaría en stock negativo',
@@ -377,18 +377,16 @@ export class StockService {
         }
 
         const newQuantity =
-          dto.operation === 'ADD'
+          dto.direction === 'ADD'
             ? currentQuantity + dto.quantity
             : currentQuantity - dto.quantity;
 
         const newBatchQuantity =
-          dto.operation === 'ADD'
+          dto.direction === 'ADD'
             ? currentBatchQuantity + dto.quantity
             : currentBatchQuantity - dto.quantity;
 
         // 3. Crear movimiento inmutable
-        const notesWithPrefix = `[${dto.operation}] ${dto.notes}`;
-
         const movement = await tx.stockMovement.create({
           data: {
             productId: dto.productId,
@@ -396,7 +394,8 @@ export class StockService {
             type: MovementType.ADJUSTMENT,
             quantity: dto.quantity,
             reference: `ADJ-${transactionId.split('-')[0]}`,
-            notes: notesWithPrefix,
+            notes: dto.notes,
+            adjustmentDirection: dto.direction,
             transactionId,
             createdById: userId,
             correctsMovementId: dto.correctsMovementId,
@@ -406,7 +405,7 @@ export class StockService {
         });
 
         // 4. Materialización
-        if (dto.operation === 'SUBTRACT') {
+        if (dto.direction === 'SUBTRACT') {
           await tx.stock.update({
             where: {
               productId_warehouseId: {
@@ -459,7 +458,7 @@ export class StockService {
 
         // 4.6 Materializar serials
         if (dto.serialNumbers && dto.serialNumbers.length > 0) {
-          if (dto.operation === 'ADD') {
+          if (dto.direction === 'ADD') {
             await this.serialNumbersService.registerInbound(
               tx,
               dto.serialNumbers,
@@ -468,7 +467,7 @@ export class StockService {
               dto.warehouseId,
               dto.batchId,
             );
-          } else if (dto.operation === 'SUBTRACT') {
+          } else if (dto.direction === 'SUBTRACT') {
             await this.serialNumbersService.registerOutbound(
               tx,
               dto.serialNumbers,
@@ -492,7 +491,7 @@ export class StockService {
         };
       });
 
-      if (dto.operation === 'SUBTRACT') {
+      if (dto.direction === 'SUBTRACT') {
         await this.alertsQueue.add('check-low-stock', {
           productId: dto.productId,
           warehouseId: dto.warehouseId,
@@ -714,8 +713,8 @@ export class StockService {
           CASE 
             WHEN sm.type = 'INBOUND' THEN sm.quantity
             WHEN sm.type = 'OUTBOUND' THEN -sm.quantity
-            WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[ADD]%' THEN sm.quantity
-            WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[SUBTRACT]%' THEN -sm.quantity
+            WHEN sm.type = 'ADJUSTMENT' AND (sm.adjustment_direction = 'ADD' OR (sm.adjustment_direction IS NULL AND COALESCE(sm.notes, '') LIKE '%[ADD]%')) THEN sm.quantity
+            WHEN sm.type = 'ADJUSTMENT' AND (sm.adjustment_direction = 'SUBTRACT' OR (sm.adjustment_direction IS NULL AND COALESCE(sm.notes, '') LIKE '%[SUBTRACT]%')) THEN -sm.quantity
             ELSE 0
           END
         ) AS "expectedQuantity",
@@ -727,8 +726,8 @@ export class StockService {
         CASE 
           WHEN sm.type = 'INBOUND' THEN sm.quantity
           WHEN sm.type = 'OUTBOUND' THEN -sm.quantity
-          WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[ADD]%' THEN sm.quantity
-          WHEN sm.type = 'ADJUSTMENT' AND COALESCE(sm.notes, '') LIKE '%[SUBTRACT]%' THEN -sm.quantity
+          WHEN sm.type = 'ADJUSTMENT' AND (sm.adjustment_direction = 'ADD' OR (sm.adjustment_direction IS NULL AND COALESCE(sm.notes, '') LIKE '%[ADD]%')) THEN sm.quantity
+          WHEN sm.type = 'ADJUSTMENT' AND (sm.adjustment_direction = 'SUBTRACT' OR (sm.adjustment_direction IS NULL AND COALESCE(sm.notes, '') LIKE '%[SUBTRACT]%')) THEN -sm.quantity
           ELSE 0
         END
       ) != COALESCE(s.quantity, 0)
