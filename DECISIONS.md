@@ -63,7 +63,7 @@
    - Se introdujo un `setTimeout` de 100ms antes de ejecutar `window.URL.revokeObjectURL(url)`. Esto otorga al navegador el margen necesario para asentar la descarga en background previniendo errores de puntero huérfano.
 
 3. **Fallback JSON en Respuestas Fallidas:**
-   - Forzar Axios a esperar un `blob` causa que respuestas de error como un JSON `400 BadRequest` (ej. si el filtro de fechas supera los 90 días) lleguen al cliente parseadas erróneamente como binarios. 
+   - Forzar Axios a esperar un `blob` causa que respuestas de error como un JSON `400 BadRequest` (ej. si el filtro de fechas supera los 60 días) lleguen al cliente parseadas erróneamente como binarios. 
    - Se interceptan las respuestas fallidas que contengan un tipo `Blob` en el `error.response.data`. Mediante `await blob.text()` y `JSON.parse()`, se reconstituye el mensaje de la excepción nativa de NestJS y se re-inyecta en el objeto de error, garantizando que los Toast notifiquen con contexto preciso en lugar de un error de lectura de stream.
 
 ## 016 - Delegación Transversal de PDF y Separación de Responsabilidades (Fase 3)
