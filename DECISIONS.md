@@ -107,3 +107,13 @@
    - Previamente, el evento genérico interno de transferencia (`TRANSFER`) en memoria utilizaba campos no documentados y despachaba un `movement_created`. La resolución arquitectónica prohíbe payloads flexibles: el `StockService` fue refactorizado para emitir dos eventos estándar de `movement_created` (`OUTBOUND` e `INBOUND`) con los IDs reales extraídos del motor, garantizando la predictibilidad de la respuesta.
 3. **Erradicación Total de `any`:**
    - Cualquier dependencia de variables comodín en el worker, dispatcher o consultas de Prisma en esta capa fue formalmente erradicada.
+
+## 020 - Ocultamiento Condicional de Swagger en Producción
+**Fecha:** 2026-08-07
+**Contexto:** La inicialización de la documentación interactiva OpenAPI a través de `SwaggerModule.setup()` en `main.ts` ocurría incondicionalmente, exponiendo los contratos de la API en producción.
+
+**Decisiones:**
+1. **Verificación de Entorno (Environment Check):**
+   - Se introdujo una comprobación estricta y sanitizada (`trim().toLowerCase()`) sobre `process.env.NODE_ENV`. El módulo de Swagger y su inicialización se omiten completamente si el entorno es evaluado como `'production'`.
+2. **Respuesta 404 por Diseño:**
+   - Al no inyectar los middlewares y controladores asociados a la UI de Swagger en NestJS, cualquier intento de acceso a `/api/docs` en producción resulta predeciblemente en un error HTTP `404 Not Found`.

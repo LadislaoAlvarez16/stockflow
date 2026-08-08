@@ -243,7 +243,7 @@ export class ImportsService {
           if (!row.sku || !row.name || !row.costPrice) {
             result.errorCount++;
             result.errors.push({
-              row: rowNum,
+              rowNumber: rowNum,
               reason: 'Faltan campos obligatorios (sku, name, costPrice)',
             });
             continue;
@@ -270,7 +270,7 @@ export class ImportsService {
           } catch (e: any) {
             result.errorCount++;
             result.errors.push({
-              row: rowNum,
+              rowNumber: rowNum,
               reason: `Error de BD: ${e.message}`,
             });
           }
@@ -333,7 +333,7 @@ export class ImportsService {
       if (!sku || isNaN(quantity) || quantity <= 0) {
         result.errorCount++;
         result.errors.push({
-          row: rowNum,
+          rowNumber: rowNum,
           reason: 'SKU faltante o cantidad inválida',
         });
         continue;
@@ -342,7 +342,7 @@ export class ImportsService {
       const productId = productMap.get(sku);
       if (!productId) {
         result.errorCount++;
-        result.errors.push({ row: rowNum, reason: `SKU ${sku} no existe` });
+        result.errors.push({ rowNumber: rowNum, reason: `SKU ${sku} no existe` });
         continue;
       }
 
@@ -361,7 +361,7 @@ export class ImportsService {
       } catch (e: any) {
         result.errorCount++;
         result.errors.push({
-          row: rowNum,
+          rowNumber: rowNum,
           reason: `Error al crear movimiento: ${e.message}`,
         });
       }

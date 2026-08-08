@@ -35,7 +35,7 @@ export class HealthController {
     // Check Redis (via BullMQ client)
     try {
       const client = await this.alertsQueue.client;
-      await client.ping();
+      await (client as any).ping();
       health.redis = 'up';
     } catch (e) {
       isHealthy = false;

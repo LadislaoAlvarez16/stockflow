@@ -57,17 +57,21 @@ async function bootstrap() {
     serverAdapter.getRouter(),
   );
 
-  const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
-  const config = new DocumentBuilder()
-    .setTitle('StockFlow API')
-    .setDescription(
-      'Documentación de la API de StockFlow para gestión de inventarios y trazabilidad',
-    )
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  const isProduction = process.env.NODE_ENV?.trim().toLowerCase() === 'production';
+
+  if (!isProduction) {
+    const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
+    const config = new DocumentBuilder()
+      .setTitle('StockFlow API')
+      .setDescription(
+        'Documentación de la API de StockFlow para gestión de inventarios y trazabilidad',
+      )
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 3000);
 }
