@@ -23,7 +23,9 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return system greeting', () => {
-      expect(appController.getHello()).toBe('Sistema StockFlow - Motor de Inventario Activo');
+      expect(appController.getHello()).toBe(
+        'Sistema StockFlow - Motor de Inventario Activo',
+      );
     });
   });
 });

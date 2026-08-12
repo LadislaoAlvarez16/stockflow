@@ -7,8 +7,6 @@ import { MovementType } from '@prisma/client';
 
 describe('ImportsService', () => {
   let service: ImportsService;
-  let prismaService: jest.Mocked<PrismaService>;
-  let stockService: jest.Mocked<StockService>;
 
   const mockPrismaService = {
     product: { findMany: jest.fn() },
@@ -31,9 +29,6 @@ describe('ImportsService', () => {
     }).compile();
 
     service = module.get<ImportsService>(ImportsService);
-    prismaService = module.get(PrismaService);
-    stockService = module.get(StockService);
-
     jest.clearAllMocks();
 
     // Default setups
@@ -70,7 +65,7 @@ describe('ImportsService', () => {
       expect(result.successCount).toBe(1);
       expect(result.errorCount).toBe(0);
       expect(result.totalProcessed).toBe(1);
-      expect(stockService.createMovement).toHaveBeenCalledWith(
+      expect(mockStockService.createMovement).toHaveBeenCalledWith(
         expect.objectContaining({
           productId: 'prod-1',
           warehouseId: 'wh-1',
@@ -82,7 +77,8 @@ describe('ImportsService', () => {
     });
 
     it('2. Fila con SKU inexistente → no llama a createMovement() → errorCount: 1, error describe el SKU faltante', async () => {
-      const csv = 'sku,warehouseCode,type,quantity\nINVALID-SKU,WH-A,INBOUND,10';
+      const csv =
+        'sku,warehouseCode,type,quantity\nINVALID-SKU,WH-A,INBOUND,10';
       const file = createCsvFile(csv);
 
       const result = await service.processMovementsCSV(file, 'user-1');
@@ -90,48 +86,55 @@ describe('ImportsService', () => {
       expect(result.successCount).toBe(0);
       expect(result.errorCount).toBe(1);
       expect(result.errors[0].reason).toContain('SKU no encontrado');
-      expect(stockService.createMovement).not.toHaveBeenCalled();
+      expect(mockStockService.createMovement).not.toHaveBeenCalled();
     });
 
     it('3. Fila con warehouseCode inexistente → errorCount: 1', async () => {
-      const csv = 'sku,warehouseCode,type,quantity\nSKU-001,INVALID-WH,INBOUND,10';
+      const csv =
+        'sku,warehouseCode,type,quantity\nSKU-001,INVALID-WH,INBOUND,10';
       const file = createCsvFile(csv);
 
       const result = await service.processMovementsCSV(file, 'user-1');
 
       expect(result.successCount).toBe(0);
       expect(result.errorCount).toBe(1);
-      expect(result.errors[0].reason).toContain('Código de depósito no encontrado');
-      expect(stockService.createMovement).not.toHaveBeenCalled();
+      expect(result.errors[0].reason).toContain(
+        'Código de depósito no encontrado',
+      );
+      expect(mockStockService.createMovement).not.toHaveBeenCalled();
     });
 
     it('4. Fila con quantity inválida (0, negativo, texto) → errorCount: 1', async () => {
       const csv1 = 'sku,warehouseCode,type,quantity\nSKU-001,WH-A,INBOUND,0';
       const csv2 = 'sku,warehouseCode,type,quantity\nSKU-001,WH-A,INBOUND,-5';
-      const csv3 = 'sku,warehouseCode,type,quantity\nSKU-001,WH-A,INBOUND,texto';
+      const csv3 =
+        'sku,warehouseCode,type,quantity\nSKU-001,WH-A,INBOUND,texto';
 
       for (const csv of [csv1, csv2, csv3]) {
         const file = createCsvFile(csv);
         const result = await service.processMovementsCSV(file, 'user-1');
         expect(result.successCount).toBe(0);
         expect(result.errorCount).toBe(1);
-        expect(result.errors[0].reason).toContain('La cantidad debe ser un número mayor a 0');
+        expect(result.errors[0].reason).toContain(
+          'La cantidad debe ser un número mayor a 0',
+        );
       }
-      expect(stockService.createMovement).not.toHaveBeenCalled();
+      expect(mockStockService.createMovement).not.toHaveBeenCalled();
     });
 
     it('5. Fila con referencia ya existente en DB → se skipea (idempotencia DB) → successCount: 1, createMovement NO llamado', async () => {
       mockPrismaService.stockMovement.findMany.mockResolvedValue([
         { reference: 'REF-123' },
       ]);
-      const csv = 'sku,warehouseCode,type,quantity,reference\nSKU-001,WH-A,INBOUND,10,REF-123';
+      const csv =
+        'sku,warehouseCode,type,quantity,reference\nSKU-001,WH-A,INBOUND,10,REF-123';
       const file = createCsvFile(csv);
 
       const result = await service.processMovementsCSV(file, 'user-1');
 
       expect(result.successCount).toBe(1); // Cuenta como éxito porque ya existe
       expect(result.errorCount).toBe(0);
-      expect(stockService.createMovement).not.toHaveBeenCalled();
+      expect(mockStockService.createMovement).not.toHaveBeenCalled();
     });
 
     it('6. Dos filas con la misma referencia en el mismo archivo → la segunda se skipea (idempotencia en memoria) → successCount: 1, errorCount: 0', async () => {
@@ -145,10 +148,10 @@ describe('ImportsService', () => {
 
       expect(result.totalProcessed).toBe(2);
       // Wait, 1 successful processing + 1 skipped due to reference memory idempotency = 2 successCount!
-      expect(result.successCount).toBe(2); 
+      expect(result.successCount).toBe(2);
       expect(result.errorCount).toBe(0);
       // Only called ONCE for the first reference
-      expect(stockService.createMovement).toHaveBeenCalledTimes(1);
+      expect(mockStockService.createMovement).toHaveBeenCalledTimes(1);
     });
 
     it('7. Mezcla: 3 filas válidas + 2 con error → successCount: 3, errorCount: 2, totalProcessed: 5', async () => {
@@ -167,7 +170,7 @@ describe('ImportsService', () => {
       expect(result.totalProcessed).toBe(5);
       expect(result.successCount).toBe(3);
       expect(result.errorCount).toBe(2);
-      expect(stockService.createMovement).toHaveBeenCalledTimes(3);
+      expect(mockStockService.createMovement).toHaveBeenCalledTimes(3);
     });
 
     it('8. Archivo que supera MAX_IMPORT_ROWS → BadRequestException antes de procesar nada', async () => {
@@ -181,7 +184,7 @@ describe('ImportsService', () => {
       await expect(service.processMovementsCSV(file, 'user-1')).rejects.toThrow(
         BadRequestException,
       );
-      expect(stockService.createMovement).not.toHaveBeenCalled();
+      expect(mockStockService.createMovement).not.toHaveBeenCalled();
     });
   });
 });

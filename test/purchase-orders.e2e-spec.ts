@@ -3,14 +3,14 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
-import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from '../src/auth/auth.service';
+import { Server } from 'http';
 
 describe('PurchaseOrders (e2e) - Smoke Test', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
   // Test Data
-  let adminUserId: string;
   let adminToken: string = 'mock-admin-token'; // We can mock the auth guard or inject a real user
 
   let supplierId: string;
@@ -39,7 +39,6 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
         role: 'ADMIN',
       },
     });
-    adminUserId = user.id;
 
     // Create Supplier
     const supplier = await prisma.supplier.create({
@@ -93,9 +92,11 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
     // Instead of complex mocking, let's bypass it by injecting the req.user directly in the controller if needed,
     // or generating a real token if AuthService is available.
     // Assuming we can get a token:
-    const authService = moduleFixture.get('AuthService');
+    const authService = moduleFixture.get<any>('AuthService');
     if (authService) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
       const tokens = await authService.generateTokens(user);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       adminToken = tokens.accessToken;
     }
   });
@@ -106,7 +107,7 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
   });
 
   it('Step 2: POST /purchase-orders creates a DRAFT order', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer() as Server)
       .post('/purchase-orders')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
@@ -119,24 +120,26 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
         ],
       });
 
+    const body = response.body as { id: string; status: string; items: any[] };
     expect(response.status).toBe(201);
-    expect(response.body.status).toBe('DRAFT');
-    expect(response.body.items).toHaveLength(3);
+    expect(body.status).toBe('DRAFT');
+    expect(body.items).toHaveLength(3);
 
-    purchaseOrderId = response.body.id;
+    purchaseOrderId = body.id;
   });
 
   it('Step 3: PATCH /purchase-orders/:id/send transitions to SENT', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer() as Server)
       .patch(`/purchase-orders/${purchaseOrderId}/send`)
       .set('Authorization', `Bearer ${adminToken}`);
 
+    const body = response.body as { status: string };
     expect(response.status).toBe(200);
-    expect(response.body.status).toBe('SENT');
+    expect(body.status).toBe('SENT');
   });
 
   it('Step 4: PATCH /purchase-orders/:id/receive (partial)', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer() as Server)
       .patch(`/purchase-orders/${purchaseOrderId}/receive`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
@@ -148,29 +151,33 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
         ],
       });
 
+    const body = response.body as { status: string };
     expect(response.status).toBe(200);
-    expect(response.body.status).toBe('PARTIAL');
+    expect(body.status).toBe('PARTIAL');
   });
 
   it('Step 5: GET /stock verifies automatic INBOUND', async () => {
     // Wait for the async stock movements to finish (they are done sequentially in the service, so they should be done)
-    const stock1 = await request(app.getHttpServer())
+    const stock1 = await request(app.getHttpServer() as Server)
       .get(`/stock/${product1Id}/${warehouseId}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
-    const stock2 = await request(app.getHttpServer())
+    const stock2 = await request(app.getHttpServer() as Server)
       .get(`/stock/${product2Id}/${warehouseId}`)
       .set('Authorization', `Bearer ${adminToken}`);
 
+    const body1 = stock1.body as { quantity: string | number };
+    const body2 = stock2.body as { quantity: string | number };
+
     expect(stock1.status).toBe(200);
-    expect(parseFloat(stock1.body.quantity)).toBe(10); // 10 received
+    expect(parseFloat(String(body1.quantity))).toBe(10); // 10 received
 
     expect(stock2.status).toBe(200);
-    expect(parseFloat(stock2.body.quantity)).toBe(5); // 5 received
+    expect(parseFloat(String(body2.quantity))).toBe(5); // 5 received
   });
 
   it('Step 6: PATCH /purchase-orders/:id/receive (completion)', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(app.getHttpServer() as Server)
       .patch(`/purchase-orders/${purchaseOrderId}/receive`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
@@ -182,7 +189,8 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
         ],
       });
 
+    const body = response.body as { status: string };
     expect(response.status).toBe(200);
-    expect(response.body.status).toBe('RECEIVED');
+    expect(body.status).toBe('RECEIVED');
   });
 });

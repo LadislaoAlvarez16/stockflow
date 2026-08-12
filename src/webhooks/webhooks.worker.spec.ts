@@ -5,16 +5,18 @@ import { PrismaService } from '../common/prisma.service';
 import { Job } from 'bullmq';
 import { WebhookJobPayload } from './interfaces/webhook-job.interface';
 import { WebhookEventType } from '@prisma/client';
-import axios from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 import * as crypto from 'crypto';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+type DeepPartial<T> = T extends object
+  ? { [P in keyof T]?: DeepPartial<T[P]> }
+  : T;
+
 describe('WebhooksWorker', () => {
   let worker: WebhooksWorker;
-  let encryptionService: jest.Mocked<WebhookEncryptionService>;
-  let prismaService: jest.Mocked<PrismaService>;
 
   const mockEncryptionService = {
     decrypt: jest.fn(),
@@ -34,9 +36,6 @@ describe('WebhooksWorker', () => {
     }).compile();
 
     worker = module.get<WebhooksWorker>(WebhooksWorker);
-    encryptionService = module.get(WebhookEncryptionService);
-    prismaService = module.get(PrismaService);
-
     jest.clearAllMocks();
   });
 
@@ -51,7 +50,7 @@ describe('WebhooksWorker', () => {
         event: WebhookEventType.stock_low,
         payload: { some: 'data' },
       },
-    } as unknown as Job<WebhookJobPayload>;
+    } as DeepPartial<Job<WebhookJobPayload>> as Job<WebhookJobPayload>;
   };
 
   describe('process', () => {
@@ -62,21 +61,29 @@ describe('WebhooksWorker', () => {
 
       await expect(worker.process(job)).resolves.toBeUndefined();
 
-      expect(encryptionService.decrypt).toHaveBeenCalledWith('encrypted-secret-abc');
+      expect(mockEncryptionService.decrypt).toHaveBeenCalledWith(
+        'encrypted-secret-abc',
+      );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockedAxios.post).toHaveBeenCalledWith(
         'https://example.com/webhook',
         JSON.stringify({ some: 'data' }),
+
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           headers: expect.objectContaining({
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             'X-StockFlow-Signature': expect.any(String),
             'X-StockFlow-Event': WebhookEventType.stock_low,
             'X-StockFlow-Delivery': 'job-id-123',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             'X-StockFlow-Timestamp': expect.any(String),
           }),
         }),
       );
-      expect(prismaService.webhookDelivery.create).toHaveBeenCalledWith(
+      expect(mockPrismaService.webhookDelivery.create).toHaveBeenCalledWith(
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           data: expect.objectContaining({
             statusCode: 200,
           }),
@@ -87,13 +94,16 @@ describe('WebhooksWorker', () => {
     it('2. Endpoint externo responde 500 → prisma llamado con 500 y relanza el error', async () => {
       const job = createJob();
       mockEncryptionService.decrypt.mockReturnValue('plain-secret');
-      const error500 = new Error('Server Error');
-      (error500 as any).response = { status: 500, data: 'Internal Error' };
+      const error500 = new Error('Server Error') as AxiosError;
+      error500.response = {
+        status: 500,
+        data: 'Internal Error',
+      } as Partial<AxiosResponse> as AxiosResponse;
       mockedAxios.post.mockRejectedValue(error500);
 
       await expect(worker.process(job)).rejects.toThrow('Server Error');
 
-      expect(prismaService.webhookDelivery.create).toHaveBeenCalledWith(
+      expect(mockPrismaService.webhookDelivery.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             statusCode: 500,
@@ -110,7 +120,7 @@ describe('WebhooksWorker', () => {
 
       await expect(worker.process(job)).rejects.toThrow('Network Timeout');
 
-      expect(prismaService.webhookDelivery.create).toHaveBeenCalledWith(
+      expect(mockPrismaService.webhookDelivery.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             statusCode: null,
@@ -127,6 +137,7 @@ describe('WebhooksWorker', () => {
 
       await expect(worker.process(job)).rejects.toThrow('Corrupt secret');
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockedAxios.post).not.toHaveBeenCalled();
     });
 
@@ -142,10 +153,13 @@ describe('WebhooksWorker', () => {
       expectedHmac.update(JSON.stringify(job.data.payload));
       const expectedSignature = expectedHmac.digest('hex');
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockedAxios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(String),
+
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           headers: expect.objectContaining({
             'X-StockFlow-Signature': `sha256=${expectedSignature}`,
           }),
@@ -157,7 +171,9 @@ describe('WebhooksWorker', () => {
       const job = createJob();
       mockEncryptionService.decrypt.mockReturnValue('plain-secret');
       mockedAxios.post.mockResolvedValue({ status: 200 });
-      mockPrismaService.webhookDelivery.create.mockRejectedValue(new Error('DB connection failed'));
+      mockPrismaService.webhookDelivery.create.mockRejectedValue(
+        new Error('DB connection failed'),
+      );
 
       // Debería resolver sin arrojar error a pesar de que el Prisma lanzó uno
       await expect(worker.process(job)).resolves.toBeUndefined();

@@ -4,14 +4,21 @@ import { PrismaService } from '../common/prisma.service';
 import { SerialNumbersService } from '../serial-numbers/serial-numbers.service';
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { getQueueToken } from '@nestjs/bullmq';
-import { MovementType, Prisma } from '@prisma/client';
+import { MovementType } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 
 describe('StockService', () => {
   let service: StockService;
-  let prismaService: PrismaService;
+  interface MockPrisma {
+    $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
+    product: { findUnique: jest.Mock };
+    stockMovement: { create: jest.Mock };
+    stock: { upsert: jest.Mock };
+    batchStock: { upsert: jest.Mock };
+  }
 
-  const mockPrismaService: any = {
+  const mockPrismaService: MockPrisma = {
     $transaction: jest.fn(async (callback) => {
       return callback(mockPrismaService);
     }),
@@ -56,13 +63,13 @@ describe('StockService', () => {
     }).compile();
 
     service = module.get<StockService>(StockService);
-    prismaService = module.get<PrismaService>(PrismaService);
 
     jest.clearAllMocks();
   });
 
   describe('createMovement', () => {
     it('debe registrar un ingreso exitoso (INBOUND)', async () => {
+      // $queryRaw retorna unknown[] por diseño — el cast es inevitable en tests
       mockPrismaService.$queryRaw.mockResolvedValueOnce([{ quantity: 10 }]); // stockLock
       mockPrismaService.stockMovement.create.mockResolvedValueOnce({
         id: 'mov-1',
@@ -94,6 +101,7 @@ describe('StockService', () => {
     });
 
     it('debe registrar un egreso exitoso (OUTBOUND)', async () => {
+      // $queryRaw retorna unknown[] por diseño — el cast es inevitable en tests
       mockPrismaService.$queryRaw.mockResolvedValueOnce([{ quantity: 20 }]); // stockLock
       mockPrismaService.stockMovement.create.mockResolvedValueOnce({
         id: 'mov-2',
@@ -126,20 +134,38 @@ describe('StockService', () => {
     });
 
     it('debe lanzar BadRequestException si el stock es insuficiente en egreso', async () => {
+      // $queryRaw retorna unknown[] por diseño — el cast es inevitable en tests
       mockPrismaService.$queryRaw.mockResolvedValueOnce([{ quantity: 2 }]); // stockLock actual = 2
 
-      const dto = { productId: 'prod-1', warehouseId: 'wh-1', type: MovementType.OUTBOUND, quantity: 5, reference: 'REF-FAIL' };
-      
-      await expect(service.createMovement(dto, 'user-1')).rejects.toThrow(BadRequestException);
+      const dto = {
+        productId: 'prod-1',
+        warehouseId: 'wh-1',
+        type: MovementType.OUTBOUND,
+        quantity: 5,
+        reference: 'REF-FAIL',
+      };
+
+      await expect(service.createMovement(dto, 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('debe lanzar BadRequestException si la cantidad es negativa o cero', async () => {
-      const dto = { productId: 'prod-1', warehouseId: 'wh-1', type: MovementType.INBOUND, quantity: -5, reference: 'REF-FAIL' };
-      
-      await expect(service.createMovement(dto, 'user-1')).rejects.toThrow(BadRequestException);
+      const dto = {
+        productId: 'prod-1',
+        warehouseId: 'wh-1',
+        type: MovementType.INBOUND,
+        quantity: -5,
+        reference: 'REF-FAIL',
+      };
+
+      await expect(service.createMovement(dto, 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('debe simular rollback en la transacción si ocurre un error interno (Prisma error)', async () => {
+      // $queryRaw retorna unknown[] por diseño — el cast es inevitable en tests
       mockPrismaService.$queryRaw.mockRejectedValueOnce(
         new Error('DB Connection lost'),
       );
@@ -160,16 +186,21 @@ describe('StockService', () => {
 
   describe('createTransfer', () => {
     it('debe fallar si origen y destino son el mismo depósito', async () => {
-      const dto = { productId: 'prod-1', fromWarehouseId: 'wh-1', toWarehouseId: 'wh-1', quantity: 5, reference: 'TR-1' };
-      
-      await expect(service.createTransfer(dto, 'user-1')).rejects.toThrow(BadRequestException);
+      const dto = {
+        productId: 'prod-1',
+        fromWarehouseId: 'wh-1',
+        toWarehouseId: 'wh-1',
+        quantity: 5,
+        reference: 'TR-1',
+      };
+
+      await expect(service.createTransfer(dto, 'user-1')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('debe ejecutar la transferencia exitosamente', async () => {
-      // Ordenamos para mockear los queryRaws del pre-bloqueo en orden alfanumérico
-      const sorted = ['wh-1', 'wh-2'].sort();
-
-      // Mocks para pre-bloqueos
+      // $queryRaw retorna unknown[] por diseño — el cast es inevitable en tests
       mockPrismaService.$queryRaw
         .mockResolvedValueOnce([{ quantity: 50 }]) // Lock origin/destination
         .mockResolvedValueOnce([{ quantity: 50 }]) // Lock origin/destination
