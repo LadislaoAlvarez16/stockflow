@@ -4,6 +4,12 @@ import * as request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 
+jest.mock('../src/reports/pdf.service', () => ({
+  PdfService: jest.fn().mockImplementation(() => ({
+    generateFromHtml: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
+  })),
+}));
+
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
 

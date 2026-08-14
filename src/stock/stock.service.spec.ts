@@ -19,7 +19,7 @@ describe('StockService', () => {
   }
 
   const mockPrismaService: MockPrisma = {
-    $transaction: jest.fn(async (callback) => {
+    $transaction: jest.fn((callback: (tx: any) => Promise<any>) => {
       return callback(mockPrismaService);
     }),
     $queryRaw: jest.fn(),

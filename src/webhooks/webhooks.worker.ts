@@ -66,7 +66,10 @@ export class WebhooksWorker extends WorkerHost {
         attemptNumber,
       });
     } catch (err: unknown) {
-      const error = err as { response?: { status?: number, data?: unknown }, message?: string };
+      const error = err as {
+        response?: { status?: number; data?: unknown };
+        message?: string;
+      };
       const duration = Date.now() - startTime;
       statusCode = error.response?.status || null;
 

@@ -57,7 +57,8 @@ async function bootstrap() {
     serverAdapter.getRouter(),
   );
 
-  const isProduction = process.env.NODE_ENV?.trim().toLowerCase() === 'production';
+  const isProduction =
+    process.env.NODE_ENV?.trim().toLowerCase() === 'production';
 
   if (!isProduction) {
     const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');

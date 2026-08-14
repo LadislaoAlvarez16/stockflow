@@ -286,3 +286,21 @@ Cada decisión incluye lo que se eligió, lo que se descartó y por qué.
 - **Procesamiento en Chunks:** Previene *Out-of-Memory* en Node.js y evita que el planificador de PostgreSQL colapse tratando de resolver un AST masivo de miles de operaciones concurrentes.
 - **Fail-soft:** UX fundamental. Para un operador cargando 5000 productos, es inaceptable que la carga falle en la fila 4999 y aborte todo. Es preferible que cargue 4999, reporte 1 error, y el operador corrija sólo ese en la UI.
 - **Reutilización del Core:** Al usar `StockService`, el Stock Inicial hereda automáticamente la inmutabilidad (`stock_movements`), los `SELECT FOR UPDATE` y la proyección concurrente, evitando tener dos lógicas distintas que escriban inventario.
+
+---
+
+### 021 — Migración a `exceljs` para procesamiento de hojas de cálculo
+**Contexto:** El uso de la librería `xlsx` (SheetJS) disparaba alertas de seguridad severas en `npm audit` por vulnerabilidades de Prototype Pollution y ReDoS.
+**Decisión:** 
+1. **Reemplazo del motor Excel:** Se eliminó `xlsx` en favor de `exceljs`.
+2. **Parser Tipado Personalizado:** Dado que `exceljs` no expone una utilidad `sheet_to_json` directa, se implementó un mapeo de filas asíncrono e indexado, usando tipados explícitos (`InventoryRowRaw = Record<string, string | number | null>`) y delegando finalmente a Zod.
+**Descartado:** 
+- Mantener `xlsx` con ignores en el audit.
+- Permitir tipos `any` al iterar los valores de Excel.
+**Por qué:**
+- **Seguridad en Supply Chain:** Mantener el repo libre de vulnerabilidades críticas y cumplir con los estándares de revisión de dependencias.
+- **Linting y Typings:** Conservar las reglas estrictas como `@typescript-eslint/no-unsafe-assignment`.
+**Consideraciones para desarrollo futuro:**
+- **Centralización:** Toda nueva exportación de reportes o importación de archivos debe basarse en `exceljs`. Evitar reintroducir librerías de hojas de cálculo redundantes.
+- **Indexación Asimétrica de exceljs:** La propiedad `row.values` de `exceljs` devuelve un array cuyo **índice 0 está siempre vacío**. Para simular un JSON a partir de una tabla, siempre se debe usar `includeEmpty: true` en `eachRow` y recordar que el valor de las columnas inicia en `[1]` y no en `[0]`.
+

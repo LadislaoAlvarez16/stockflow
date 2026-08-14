@@ -15,7 +15,10 @@ import { CreateWebhookDto } from './dto/create-webhook.dto';
 import { UpdateWebhookDto } from './dto/update-webhook.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole, WebhookEventType } from '@prisma/client';
-import { CurrentUser, JwtPayload } from '../common/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  JwtPayload,
+} from '../common/decorators/current-user.decorator';
 
 @Controller('webhooks')
 @Roles(UserRole.ADMIN)
@@ -56,7 +59,10 @@ export class WebhooksController {
   }
 
   @Post()
-  create(@Body() createWebhookDto: CreateWebhookDto, @CurrentUser() user: JwtPayload) {
+  create(
+    @Body() createWebhookDto: CreateWebhookDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
     const userId = user.id;
     return this.webhooksService.create(createWebhookDto, userId);
   }

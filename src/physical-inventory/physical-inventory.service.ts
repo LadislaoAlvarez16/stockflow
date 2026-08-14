@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { StockService } from '../stock/stock.service';
 import { CreateAdjustmentDto } from '../stock/dto/create-adjustment.dto';
-import * as xlsx from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { PhysicalInventoryStatus, Prisma } from '@prisma/client';
 
@@ -21,6 +21,7 @@ const InventoryRowSchema = z.object({
 });
 
 type InventoryRow = z.infer<typeof InventoryRowSchema>;
+type InventoryRowRaw = Record<string, string | number | null>;
 
 import { WebhookDispatcherService } from '../webhooks/webhook-dispatcher.service';
 import { WebhookEventType } from '@prisma/client';
@@ -66,12 +67,35 @@ export class PhysicalInventoryService {
       [];
 
     try {
-      // 2. Parsear el archivo con SheetJS
-      const workbook = xlsx.read(file.buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      // defval: null garantiza que celdas vacías vengan en null y no en undefined
-      const rawRows = xlsx.utils.sheet_to_json(worksheet, { defval: null });
+      // 2. Parsear el archivo con exceljs
+      const workbook = new ExcelJS.Workbook();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+      await workbook.xlsx.load(file.buffer as any);
+      const worksheet = workbook.worksheets[0];
+
+      const rawRows: InventoryRowRaw[] = [];
+      let headers: string[] = [];
+
+      worksheet.eachRow(
+        { includeEmpty: true },
+        (row: ExcelJS.Row, rowNumber: number) => {
+          const values = row.values as any[];
+          if (rowNumber === 1) {
+            headers = values.map((v) => (v ? v.toString() : ''));
+          } else {
+            const rowData: InventoryRowRaw = {};
+            for (let i = 1; i < headers.length; i++) {
+              if (headers[i]) {
+                rowData[headers[i]] =
+                  values[i] === undefined
+                    ? null
+                    : (values[i] as string | number | null);
+              }
+            }
+            rawRows.push(rowData);
+          }
+        },
+      );
 
       // 3. Pre-load O(1) del inventario actual para este depósito
       // Obtenemos todos los productos activos y sus stocks/batches en este warehouse
@@ -175,7 +199,8 @@ export class PhysicalInventoryService {
         if (difference === 0) {
           matchedItems++;
         } else {
-          const direction = difference > 0 ? 'ADD' : ('SUBTRACT' as 'ADD' | 'SUBTRACT');
+          const direction =
+            difference > 0 ? 'ADD' : ('SUBTRACT' as 'ADD' | 'SUBTRACT');
           const qtyToAdjust = Math.abs(difference);
 
           adjustmentsToProcess.push({

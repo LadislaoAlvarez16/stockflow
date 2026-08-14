@@ -3,8 +3,13 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
-import { AuthService } from '../src/auth/auth.service';
 import { Server } from 'http';
+
+jest.mock('../src/reports/pdf.service', () => ({
+  PdfService: jest.fn().mockImplementation(() => ({
+    generateFromHtml: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
+  })),
+}));
 
 describe('PurchaseOrders (e2e) - Smoke Test', () => {
   let app: INestApplication;
@@ -92,9 +97,10 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
     // Instead of complex mocking, let's bypass it by injecting the req.user directly in the controller if needed,
     // or generating a real token if AuthService is available.
     // Assuming we can get a token:
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const authService = moduleFixture.get<any>('AuthService');
     if (authService) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const tokens = await authService.generateTokens(user);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       adminToken = tokens.accessToken;

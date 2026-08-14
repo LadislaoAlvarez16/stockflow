@@ -342,7 +342,10 @@ export class ImportsService {
       const productId = productMap.get(sku);
       if (!productId) {
         result.errorCount++;
-        result.errors.push({ rowNumber: rowNum, reason: `SKU ${sku} no existe` });
+        result.errors.push({
+          rowNumber: rowNum,
+          reason: `SKU ${sku} no existe`,
+        });
         continue;
       }
 

@@ -105,6 +105,7 @@ describe('WebhooksWorker', () => {
 
       expect(mockPrismaService.webhookDelivery.create).toHaveBeenCalledWith(
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           data: expect.objectContaining({
             statusCode: 500,
           }),
@@ -122,6 +123,7 @@ describe('WebhooksWorker', () => {
 
       expect(mockPrismaService.webhookDelivery.create).toHaveBeenCalledWith(
         expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           data: expect.objectContaining({
             statusCode: null,
           }),
