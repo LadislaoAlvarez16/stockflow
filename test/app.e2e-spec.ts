@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
 import * as request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
@@ -18,9 +18,13 @@ describe('AppController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(Logger)
+      .useValue({ log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() })
+      .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useLogger(false);
     await app.init();
   });
 

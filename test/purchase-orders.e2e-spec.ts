@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
@@ -31,9 +31,13 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(Logger)
+      .useValue({ log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() })
+      .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useLogger(false);
     await app.init();
 
     prisma = app.get<PrismaService>(PrismaService);
