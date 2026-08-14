@@ -3,7 +3,10 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/common/prisma.service';
+import { JwtService } from '@nestjs/jwt';
 import { Server } from 'http';
+import { Queue } from 'bullmq';
+import { getQueueToken } from '@nestjs/bullmq';
 
 jest.mock('../src/reports/pdf.service', () => ({
   PdfService: jest.fn().mockImplementation(() => ({
@@ -96,19 +99,22 @@ describe('PurchaseOrders (e2e) - Smoke Test', () => {
     // Mocking AuthGuard is complex here since the project uses JwtAuthGuard globally.
     // Instead of complex mocking, let's bypass it by injecting the req.user directly in the controller if needed,
     // or generating a real token if AuthService is available.
-    // Assuming we can get a token:
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const authService = moduleFixture.get<any>('AuthService');
-    if (authService) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      const tokens = await authService.generateTokens(user);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-      adminToken = tokens.accessToken;
+    const jwtService = moduleFixture.get(JwtService);
+    if (jwtService) {
+      adminToken = jwtService.sign({
+        email: user.email,
+        sub: user.id,
+        role: user.role,
+      });
     }
   });
 
   afterAll(async () => {
-    // Cleanup if necessary, or let DB isolate
+    // Pausar las colas antes de cerrar la app para evitar leaks de Jest
+    const alertsQueue = app.get<Queue>(getQueueToken('alerts'));
+    const webhooksQueue = app.get<Queue>(getQueueToken('webhooks'));
+    await alertsQueue.pause();
+    await webhooksQueue.pause();
     await app.close();
   });
 
