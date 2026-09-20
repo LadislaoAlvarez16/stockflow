@@ -8,7 +8,10 @@ import { ExpressAdapter } from '@bull-board/express';
 import * as basicAuth from 'express-basic-auth';
 import { Queue } from 'bullmq';
 
+import { assertRequiredEnv } from './config/assert-env';
+
 async function bootstrap() {
+  assertRequiredEnv();
   const app = await NestFactory.create(AppModule);
 
   const frontendUrl = process.env.FRONTEND_URL;

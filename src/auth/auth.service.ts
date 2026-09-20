@@ -69,9 +69,7 @@ export class AuthService {
     let payload: any;
     try {
       payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret:
-          this.configService.get<string>('JWT_SECRET') ||
-          'change-this-in-production',
+        secret: this.configService.get<string>('JWT_SECRET')!,
       });
     } catch (e) {
       throw new UnauthorizedException('Access denied');

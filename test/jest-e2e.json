@@ -8,5 +8,8 @@
   },
   "moduleNameMapper": {
     "^puppeteer$": "<rootDir>/mocks/puppeteer.mock.js"
-  }
+  },
+  "setupFiles": [
+    "<rootDir>/setup-env.js"
+  ]
 }
