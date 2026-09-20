@@ -33,42 +33,46 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new PrismaExceptionFilter());
 
-  // Fail fast: Verify Bull Board credentials
-  const bullUser = process.env.BULL_BOARD_USER;
-  const bullPassword = process.env.BULL_BOARD_PASSWORD;
+  const bullEnabled = process.env.BULL_BOARD_ENABLED === 'true';
 
-  if (!bullUser || !bullPassword) {
-    throw new Error(
-      'FATAL ERROR: BULL_BOARD_USER and BULL_BOARD_PASSWORD must be defined in environment variables.',
+  if (bullEnabled) {
+    // Fail fast: Verify Bull Board credentials
+    const bullUser = process.env.BULL_BOARD_USER;
+    const bullPassword = process.env.BULL_BOARD_PASSWORD;
+
+    if (!bullUser || !bullPassword) {
+      throw new Error(
+        'FATAL ERROR: BULL_BOARD_USER and BULL_BOARD_PASSWORD must be defined in environment variables when BULL_BOARD_ENABLED is true.',
+      );
+    }
+
+    // Bull Board Setup
+    const serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath('/admin/queues');
+
+    const alertsQueue = app.get<Queue>(getQueueToken('alerts'));
+    const notificationsQueue = app.get<Queue>(getQueueToken('notifications'));
+
+    createBullBoard({
+      queues: [
+        new BullMQAdapter(alertsQueue),
+        new BullMQAdapter(notificationsQueue),
+      ],
+      serverAdapter,
+    });
+
+    app.use(
+      '/admin/queues',
+      basicAuth({
+        users: {
+          [bullUser]: bullPassword,
+        },
+        challenge: true,
+        realm: 'Bull Board Admin Area',
+      }),
+      serverAdapter.getRouter(),
     );
   }
-
-  // Bull Board Setup
-  const serverAdapter = new ExpressAdapter();
-  serverAdapter.setBasePath('/admin/queues');
-
-  const alertsQueue = app.get<Queue>(getQueueToken('alerts'));
-  const notificationsQueue = app.get<Queue>(getQueueToken('notifications'));
-
-  createBullBoard({
-    queues: [
-      new BullMQAdapter(alertsQueue),
-      new BullMQAdapter(notificationsQueue),
-    ],
-    serverAdapter,
-  });
-
-  app.use(
-    '/admin/queues',
-    basicAuth({
-      users: {
-        [bullUser]: bullPassword,
-      },
-      challenge: true,
-      realm: 'Bull Board Admin Area',
-    }),
-    serverAdapter.getRouter(),
-  );
 
   const isProduction =
     process.env.NODE_ENV?.trim().toLowerCase() === 'production';
