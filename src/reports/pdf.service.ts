@@ -13,7 +13,12 @@ export class PdfService {
     let browser: puppeteer.Browser | undefined;
     try {
       browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+        ],
         headless: true, // headless is default, just explicit
       });
 

@@ -13,6 +13,7 @@ import { assertRequiredEnv } from './config/assert-env';
 async function bootstrap() {
   assertRequiredEnv();
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
 
   const frontendUrl = process.env.FRONTEND_URL;
   app.enableCors({
