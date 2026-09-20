@@ -69,8 +69,12 @@ export class PhysicalInventoryService {
     try {
       // 2. Parsear el archivo con exceljs
       const workbook = new ExcelJS.Workbook();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-      await workbook.xlsx.load(file.buffer.buffer as ArrayBuffer);
+      const buf = file.buffer;
+      const arrayBuffer = buf.buffer.slice(
+        buf.byteOffset,
+        buf.byteOffset + buf.byteLength,
+      ) as ArrayBuffer;
+      await workbook.xlsx.load(arrayBuffer);
       const worksheet = workbook.worksheets[0];
 
       const rawRows: InventoryRowRaw[] = [];
