@@ -16,8 +16,17 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const frontendUrl = process.env.FRONTEND_URL;
+  let origin: string | string[] = '*';
+
+  if (frontendUrl) {
+    const urls = frontendUrl.split(',').map((u) => u.trim().replace(/\/$/, ''));
+    origin = urls.length === 1 ? urls[0] : urls;
+  } else if (process.env.NODE_ENV?.trim().toLowerCase() === 'production') {
+    origin = []; // Block all origins if not defined in production (though assertRequiredEnv should have caught this)
+  }
+
   app.enableCors({
-    origin: frontendUrl || '*',
+    origin,
   });
 
   const { ValidationPipe } = require('@nestjs/common');
