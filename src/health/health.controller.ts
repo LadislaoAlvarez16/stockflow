@@ -4,6 +4,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
+import { Public } from '../common/decorators/public.decorator';
+
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {
@@ -12,6 +14,7 @@ export class HealthController {
     @InjectQueue('alerts') private readonly alertsQueue: Queue,
   ) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Verifica el estado del sistema (API, BD, Redis)' })
   async check() {
