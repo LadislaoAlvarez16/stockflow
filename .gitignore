@@ -44,6 +44,11 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
+.env.production
+
+/*-check.txt
+/lint_output*.txt
+/final-lint.txt
 
 # temp directory
 .temp
