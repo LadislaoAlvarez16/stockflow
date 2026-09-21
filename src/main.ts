@@ -33,7 +33,8 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new PrismaExceptionFilter());
 
-  const bullEnabled = process.env.BULL_BOARD_ENABLED === 'true';
+  const isProduction = process.env.NODE_ENV?.trim().toLowerCase() === 'production';
+  const bullEnabled = !isProduction || process.env.BULL_BOARD_ENABLED === 'true';
 
   if (bullEnabled) {
     // Fail fast: Verify Bull Board credentials
@@ -74,8 +75,6 @@ async function bootstrap() {
     );
   }
 
-  const isProduction =
-    process.env.NODE_ENV?.trim().toLowerCase() === 'production';
 
   if (!isProduction) {
     const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
