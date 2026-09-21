@@ -10,6 +10,7 @@ import { CreateAdjustmentDto } from '../stock/dto/create-adjustment.dto';
 import * as ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { PhysicalInventoryStatus, Prisma } from '@prisma/client';
+import { toArrayBuffer } from '../utils/buffer.util';
 
 const InventoryRowSchema = z.object({
   sku: z.string().min(1, 'SKU is required'),
@@ -70,10 +71,7 @@ export class PhysicalInventoryService {
       // 2. Parsear el archivo con exceljs
       const workbook = new ExcelJS.Workbook();
       const buf = file.buffer;
-      const arrayBuffer = buf.buffer.slice(
-        buf.byteOffset,
-        buf.byteOffset + buf.byteLength,
-      ) as ArrayBuffer;
+      const arrayBuffer = toArrayBuffer(buf);
       await workbook.xlsx.load(arrayBuffer);
       const worksheet = workbook.worksheets[0];
 
