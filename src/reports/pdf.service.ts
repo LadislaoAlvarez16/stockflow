@@ -18,8 +18,6 @@ export class PdfService {
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-gpu',
-          '--no-zygote',
-          '--single-process',
         ],
         headless: true, // headless is default, just explicit
       });
