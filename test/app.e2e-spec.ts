@@ -20,7 +20,12 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     })
       .overrideProvider(Logger)
-      .useValue({ log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() })
+      .useValue({
+        log: jest.fn(),
+        error: jest.fn(),
+        warn: jest.fn(),
+        debug: jest.fn(),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

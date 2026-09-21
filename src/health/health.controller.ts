@@ -38,8 +38,10 @@ export class HealthController {
     // Check Redis (via BullMQ client)
     try {
       await Promise.race([
-        this.alertsQueue.client.then(client => (client as any).ping()),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+        this.alertsQueue.client.then((client) => (client as any).ping()),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 2000),
+        ),
       ]);
       health.redis = 'up';
     } catch (e) {
