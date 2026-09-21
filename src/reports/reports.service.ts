@@ -85,33 +85,33 @@ export class ReportsService {
       items.sort((a, b) => a.name.localeCompare(b.name));
       let categoryTotal = 0;
 
-      htmlContent += `<tr class="category-row"><td colspan="5">Categoría: \${category}</td></tr>`;
+      htmlContent += `<tr class="category-row"><td colspan="5">Categoría: ${category}</td></tr>`;
 
       for (const item of items) {
         categoryTotal += item.totalValue;
         htmlContent += `
           <tr>
-            <td>\${item.sku}</td><td>\${item.name}</td>
-            <td class="text-right">\${item.quantity.toLocaleString('es-AR')}</td>
-            <td class="text-right">$\${item.costPrice.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            <td class="text-right">$\${item.totalValue.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td>${item.sku}</td><td>${item.name}</td>
+            <td class="text-right">${item.quantity.toLocaleString('es-AR')}</td>
+            <td class="text-right">$${item.costPrice.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="text-right">$${item.totalValue.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           </tr>
         `;
       }
-      htmlContent += `<tr class="subtotal-row"><td colspan="4" class="text-right">Subtotal \${category}:</td><td class="text-right">$\${categoryTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
+      htmlContent += `<tr class="subtotal-row"><td colspan="4" class="text-right">Subtotal ${category}:</td><td class="text-right">$${categoryTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`;
     }
 
     htmlContent += `
         </tbody>
         <tfoot>
-          <tr class="total-row"><td colspan="4" class="text-right">TOTAL GENERAL:</td><td class="text-right">$\${grandTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+          <tr class="total-row"><td colspan="4" class="text-right">TOTAL GENERAL:</td><td class="text-right">$${grandTotal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
         </tfoot>
       </table>
     `;
 
     let subtitle = 'Consolidado Global';
     if (warehouseId && stocks.length > 0)
-      subtitle = `Depósito: \${stocks[0].warehouse.name}`;
+      subtitle = `Depósito: ${stocks[0].warehouse.name}`;
 
     const fullHtml = PdfService.baseReportLayout(htmlContent, {
       title: 'Reporte de Valorización de Stock',
@@ -232,14 +232,14 @@ export class ReportsService {
 
         htmlContent += `
           <tr>
-            <td style="font-size: 10px;">\${dateStr}</td>
-            <td><span style="background-color: \${color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold;">\${mov.type}</span></td>
-            <td>\${mov.product.sku}</td>
-            <td>\${mov.warehouse.name}</td>
-            <td class="text-right">\${Number(mov.quantity).toLocaleString('es-AR')}</td>
-            <td style="font-size: 10px;">\${mov.reference}</td>
-            <td>\${mov.batch ? mov.batch.batchNumber : '-'}</td>
-            <td style="font-size: 10px;">\${mov.createdBy.name}</td>
+            <td style="font-size: 10px;">${dateStr}</td>
+            <td><span style="background-color: ${color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold;">${mov.type}</span></td>
+            <td>${mov.product.sku}</td>
+            <td>${mov.warehouse.name}</td>
+            <td class="text-right">${Number(mov.quantity).toLocaleString('es-AR')}</td>
+            <td style="font-size: 10px;">${mov.reference}</td>
+            <td>${mov.batch ? mov.batch.batchNumber : '-'}</td>
+            <td style="font-size: 10px;">${mov.createdBy.name}</td>
           </tr>
         `;
       }
@@ -264,10 +264,10 @@ export class ReportsService {
           </thead>
           <tbody>
             <tr>
-              <td class="text-right" style="font-weight: bold;">\${totals.INBOUND.toLocaleString('es-AR')}</td>
-              <td class="text-right" style="font-weight: bold;">\${totals.OUTBOUND.toLocaleString('es-AR')}</td>
-              <td class="text-right" style="font-weight: bold;">\${totals.TRANSFER.toLocaleString('es-AR')}</td>
-              <td class="text-right" style="font-weight: bold;">\${totals.ADJUSTMENT.toLocaleString('es-AR')}</td>
+              <td class="text-right" style="font-weight: bold;">${totals.INBOUND.toLocaleString('es-AR')}</td>
+              <td class="text-right" style="font-weight: bold;">${totals.OUTBOUND.toLocaleString('es-AR')}</td>
+              <td class="text-right" style="font-weight: bold;">${totals.TRANSFER.toLocaleString('es-AR')}</td>
+              <td class="text-right" style="font-weight: bold;">${totals.ADJUSTMENT.toLocaleString('es-AR')}</td>
             </tr>
           </tbody>
         </table>
@@ -276,7 +276,7 @@ export class ReportsService {
 
     const fullHtml = PdfService.baseReportLayout(htmlContent, {
       title: 'Historial de Movimientos de Stock',
-      subtitle: `Período: \${from.toLocaleDateString('es-AR')} al \${to.toLocaleDateString('es-AR')}`,
+      subtitle: `Período: ${from.toLocaleDateString('es-AR')} al ${to.toLocaleDateString('es-AR')}`,
       date: new Date().toLocaleDateString('es-AR', {
         year: 'numeric',
         month: 'long',
@@ -364,12 +364,12 @@ export class ReportsService {
       for (const bs of b.batchStocks) {
         htmlContent += `
           <tr>
-            <td style="font-weight: bold;">\${vto.toLocaleDateString('es-AR')}</td>
-            <td><span style="background-color: \${colorClass}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">\${diffDays} días</span></td>
-            <td>\${b.batchNumber}</td>
-            <td>\${b.product.name} <br><small style="color: #6b7280;">\${b.product.sku}</small></td>
-            <td>\${bs.warehouse.name}</td>
-            <td class="text-right">\${Number(bs.quantity).toLocaleString('es-AR')}</td>
+            <td style="font-weight: bold;">${vto.toLocaleDateString('es-AR')}</td>
+            <td><span style="background-color: ${colorClass}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">${diffDays} días</span></td>
+            <td>${b.batchNumber}</td>
+            <td>${b.product.name} <br><small style="color: #6b7280;">${b.product.sku}</small></td>
+            <td>${bs.warehouse.name}</td>
+            <td class="text-right">${Number(bs.quantity).toLocaleString('es-AR')}</td>
           </tr>
         `;
       }
@@ -382,7 +382,7 @@ export class ReportsService {
 
     let subtitle = 'Listado global de lotes con stock';
     if (warehouseId) subtitle += ` | Depósito Filtrado`;
-    if (expiresInDays) subtitle += ` | Vencimiento <= \${expiresInDays} días`;
+    if (expiresInDays) subtitle += ` | Vencimiento <= ${expiresInDays} días`;
 
     const fullHtml = PdfService.baseReportLayout(htmlContent, {
       title: 'Reporte de Lotes por Vencer',
@@ -430,13 +430,13 @@ export class ReportsService {
       <div style="margin-bottom: 20px;">
         <h3 style="color: #374151; font-size: 16px; margin-bottom: 10px; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px;">Resumen Ejecutivo</h3>
         <ul style="list-style-type: none; padding: 0; font-size: 14px;">
-          <li><strong>Depósito:</strong> \${session.warehouse.name}</li>
-          <li><strong>Responsable:</strong> \${session.createdBy.name} (\${session.createdBy.email})</li>
-          <li><strong>Estado:</strong> \${session.status}</li>
-          <li style="margin-top: 10px;"><strong>Ítems Contados Totales:</strong> \${session.totalItems}</li>
-          <li><span style="color: #10b981; font-weight: bold;">Sin Diferencia (Matched):</span> \${session.matchedItems}</li>
-          <li><span style="color: #f59e0b; font-weight: bold;">Con Diferencia (Adjusted):</span> \${session.adjustedItems}</li>
-          <li><span style="color: #6b7280; font-weight: bold;">Omitidos (Skipped):</span> \${session.skippedItems}</li>
+          <li><strong>Depósito:</strong> ${session.warehouse.name}</li>
+          <li><strong>Responsable:</strong> ${session.createdBy.name} (${session.createdBy.email})</li>
+          <li><strong>Estado:</strong> ${session.status}</li>
+          <li style="margin-top: 10px;"><strong>Ítems Contados Totales:</strong> ${session.matchedItems + session.adjustedItems + session.skippedItems}</li>
+          <li><span style="color: #10b981; font-weight: bold;">Sin Diferencia (Matched):</span> ${session.matchedItems}</li>
+          <li><span style="color: #f59e0b; font-weight: bold;">Con Diferencia (Adjusted):</span> ${session.adjustedItems}</li>
+          <li><span style="color: #6b7280; font-weight: bold;">Omitidos (Skipped):</span> ${session.skippedItems}</li>
         </ul>
       </div>
     `;
@@ -468,11 +468,11 @@ export class ReportsService {
 
         htmlContent += `
           <tr>
-            <td>\${mov.product.sku}</td>
-            <td>\${mov.product.name}</td>
-            <td>\${mov.batch ? mov.batch.batchNumber : '-'}</td>
-            <td class="text-right" style="color: \${color}; font-weight: bold;">\${sign}\${Number(mov.quantity).toLocaleString('es-AR')}</td>
-            <td style="font-size: 11px;">\${mov.notes || '-'}</td>
+            <td>${mov.product.sku}</td>
+            <td>${mov.product.name}</td>
+            <td>${mov.batch ? mov.batch.batchNumber : '-'}</td>
+            <td class="text-right" style="color: ${color}; font-weight: bold;">${sign}${Number(mov.quantity).toLocaleString('es-AR')}</td>
+            <td style="font-size: 11px;">${mov.notes || '-'}</td>
           </tr>
         `;
       }
@@ -503,8 +503,8 @@ export class ReportsService {
       for (const err of session.errorLog as any[]) {
         htmlContent += `
           <tr>
-            <td style="color: #991b1b; font-weight: bold;">\${err.row || '-'}</td>
-            <td style="color: #991b1b;">\${JSON.stringify(err.error || err)}</td>
+            <td style="color: #991b1b; font-weight: bold;">${err.row || '-'}</td>
+            <td style="color: #991b1b;">${JSON.stringify(err.error || err)}</td>
           </tr>
         `;
       }
@@ -523,7 +523,7 @@ export class ReportsService {
 
     const fullHtml = PdfService.baseReportLayout(htmlContent, {
       title: 'Comprobante de Sesión de Inventario Físico',
-      subtitle: `ID Sesión: \${session.id}`,
+      subtitle: `ID Sesión: ${session.id}`,
       date: dateStr,
     });
 

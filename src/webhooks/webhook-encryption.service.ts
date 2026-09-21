@@ -28,7 +28,7 @@ export class WebhookEncryptionService {
       const authTag = cipher.getAuthTag().toString('hex');
 
       // format: iv:encrypted:authTag
-      return `\${iv.toString('hex')}:\${encrypted}:\${authTag}`;
+      return `${iv.toString('hex')}:${encrypted}:${authTag}`;
     } catch (error) {
       throw new InternalServerErrorException('Error encrypting webhook secret');
     }
