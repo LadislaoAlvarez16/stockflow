@@ -6,7 +6,7 @@ const port = 3001;
 
 // Obtenemos el secret crudo que le dimos a la suscripcion de prueba
 // (Lo definiremos al crear la suscripcion en el script de test)
-const SECRET = 'mi-secret-super-seguro-123'; 
+const SECRET = 'aeb13c63c6c3f342d8952662183f75c2581810bfcf87a72cd0f6532e5e09ed21'; 
 
 let attemptCount = 0;
 
@@ -53,6 +53,6 @@ app.post('/webhook-receiver', (req, res) => {
   res.status(200).json({ message: 'Recibido correctamente' });
 });
 
-app.listen(port, '127.0.0.1', () => {
-  console.log(`[Mock Server] Escuchando en http://127.0.0.1:\${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`[Mock Server] Escuchando en http://0.0.0.0:${port}`);
 });
