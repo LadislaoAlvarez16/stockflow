@@ -13,7 +13,12 @@ export class PdfService {
     let browser: puppeteer.Browser | undefined;
     try {
       browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+        ],
         headless: true, // headless is default, just explicit
       });
 
@@ -49,7 +54,7 @@ export class PdfService {
       <html lang="es">
       <head>
         <meta charset="UTF-8">
-        <title>\${meta.title}</title>
+        <title>${meta.title}</title>
         <style>
           @page {
             size: A4;
@@ -145,13 +150,13 @@ export class PdfService {
       <body>
         <div class="header">
           <h1>StockFlow</h1>
-          <h2>\${meta.title}</h2>
-          \${meta.subtitle ? \`<p>\${meta.subtitle}</p>\` : ''}
-          <p>Fecha de Emisión: \${meta.date}</p>
+          <h2>${meta.title}</h2>
+          ${meta.subtitle ? `<p>${meta.subtitle}</p>` : ''}
+          <p>Fecha de Emisión: ${meta.date}</p>
         </div>
         
         <div class="content">
-          \${content}
+          ${content}
         </div>
         
         <!-- Puppeteer can inject footer via headerTemplate/footerTemplate if needed, 

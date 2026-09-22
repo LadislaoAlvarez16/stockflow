@@ -124,7 +124,7 @@ export class WebhookSubscriptionsService {
 
     if (!subscription) {
       throw new NotFoundException(
-        `Webhook subscription with ID \${id} not found`,
+        `Webhook subscription with ID ${id} not found`,
       );
     }
 

@@ -116,11 +116,11 @@ export class ReportsController {
 
   private sendPdfResponse(res: Response, buffer: Buffer, prefix: string) {
     const dateStr = new Date().toISOString().split('T')[0];
-    const filename = `\${prefix}-\${dateStr}.pdf`;
+    const filename = `${prefix}-${dateStr}.pdf`;
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="\${filename}"`,
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': buffer.length,
     });
 

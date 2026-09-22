@@ -18,7 +18,6 @@ import { CategoriesModule } from './categories/categories.module';
 import { QueueModule } from './queue/queue.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { DebugModule } from './common/debug/debug.module';
 import { BatchesModule } from './batches/batches.module';
 import { PhysicalInventoryModule } from './physical-inventory/physical-inventory.module';
 import { ReportsModule } from './reports/reports.module';
@@ -48,7 +47,6 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
     CommonModule,
     CategoriesModule,
     NotificationsModule,
-    DebugModule,
     ReportsModule,
     WebhooksModule,
     SuppliersModule,

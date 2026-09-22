@@ -5,6 +5,9 @@ import { v4 as uuidv4 } from 'uuid';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Seed destructivo abortado en entorno de produccion.');
+  }
   console.log('Cleaning database...');
   // Limpiamos en orden para evitar conflictos o usamos TRUNCATE CASCADE para más seguridad
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE "users", "categories", "products", "warehouses", "stock_movements", "stocks" CASCADE;`);

@@ -35,7 +35,7 @@ export class BatchesCronService {
     }
 
     this.logger.log(
-      `checkExpiringBatches finalizado. Se detectaron \${expiringBatches.length} lotes por vencer.`,
+      `checkExpiringBatches finalizado. Se detectaron ${expiringBatches.length} lotes por vencer.`,
     );
   }
 }

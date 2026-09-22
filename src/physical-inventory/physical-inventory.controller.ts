@@ -80,7 +80,7 @@ export class PhysicalInventoryController {
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="inventory-session-\${id}.pdf"`,
+      'Content-Disposition': `attachment; filename="inventory-session-${id}.pdf"`,
       'Content-Length': pdfBuffer.length,
     });
 

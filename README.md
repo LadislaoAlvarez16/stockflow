@@ -72,12 +72,15 @@ En empresas de distribución o retail, el inventario físico rara vez coincide c
    npx prisma migrate dev
    ```
 
-3. **Ejecutar Tests y Seed de Base de Datos:**
+3. **Ejecutar Tests y Configurar la Base de Datos:**
    ```bash
    npm test
+   # En desarrollo (destructivo, crea datos de prueba):
    npm run seed
+   # En producción (idempotente, crea solo el admin si no existe):
+   npm run bootstrap:admin
    ```
-   *(El Seed creará al admin: `admin@stockflow.local` / `admin123`)*
+   *(El Seed de desarrollo creará al admin: `admin@stockflow.com` / `password123`)*
 
 4. **Levantar el Servidor:**
    ```bash
