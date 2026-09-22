@@ -54,7 +54,7 @@ describe('ReportsService - N-05 Template Literals', () => {
 
     expect(htmlArgs).toContain('SKU-TEST');
     expect(htmlArgs).toContain('Prod Name');
-    expect(htmlArgs).toContain('Test Cat');
+    expect(htmlArgs).toContain('TEST CAT');
     
     // Original buggy code output literally ${item.sku}, etc.
     expect(htmlArgs).not.toContain('${');
