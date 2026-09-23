@@ -45,6 +45,11 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer())
       .get('/health')
       .expect(200)
-      .expect({ status: 'ok' });
+      .expect((res) => {
+        expect(res.body.api).toBe('up');
+        expect(res.body.database).toBe('up');
+        expect(res.body.redis).toBe('up');
+        expect(res.body.timestamp).toBeDefined();
+      });
   });
 });
